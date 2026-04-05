@@ -43,7 +43,7 @@ optional<FrameVariant> FrameParser::parse(span<const uint8_t> buffer, int8_t rss
     {
         ProbeRequestFrame probe;
         probe.base = baseFrame;
-        
+
         if(!parseProbeRequestTags(buffer.subspan(24), probe))
             return nullopt;
 
@@ -63,7 +63,7 @@ bool FrameParser::parseBeaconTags(span<const uint8_t> payload, BeaconFrame& beac
 
     while(offset < payload.size())
     {
-        if(offset + 1 > payload.size())
+        if(offset + 1 >= payload.size())
             return false;
 
         uint8_t tagNumber = payload[offset];
@@ -89,7 +89,7 @@ bool FrameParser::parseProbeRequestTags(span<const uint8_t> payload, ProbeReques
 
     while(offset < payload.size())
     {
-        if(offset + 1 > payload.size())
+        if(offset + 1 >= payload.size())
             return false;
 
         uint8_t tagNumber = payload[offset];
