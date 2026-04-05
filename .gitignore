@@ -20,3 +20,6 @@
 # OS generated files
 Thumbs.db
 .DS_Store
+
+# User-specific files
+all_code.txt
