@@ -26,7 +26,6 @@ struct BeaconFrame          // Фрейм, який розсилає точка 
 };
 
 struct ProbeRequestFrame    // Фрейм, який надсилає клієнт для пошуку доступних мереж Wi-Fi
-
 {
     RawFrame base;
     std::string ssid;
