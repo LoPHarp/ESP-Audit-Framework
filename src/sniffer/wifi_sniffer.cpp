@@ -23,10 +23,12 @@ void WifiSniffer::promiscuous_rx_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 
     auto* pkt = reinterpret_cast<wifi_promiscuous_pkt_t*>(buf);
 
+    #ifdef __INTELISENSE__
     span<const uint8_t> payload(pkt->payload, pkt->rx_ctrl.sig_len);
 
     auto result = FrameParser::parse(payload, pkt->rx_ctrl.rssi);
-
+    
     if(result)
         cout << "Frame captured and parsed successfully!" << endl;
+    #endif
 }

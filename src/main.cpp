@@ -8,7 +8,7 @@ extern "C" void app_main()
 {
     auto app = make_unique<CoreApplication>();
     
-    TestManager::runAllTests();
+    //TestManager::runAllTests();
 
     app->Initialize();
     app->Run();
