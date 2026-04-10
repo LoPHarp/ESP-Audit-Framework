@@ -1,5 +1,5 @@
-#include "core_application.h"
-#include "../sniffer/wifi_sniffer.h"
+#include "core_application.hpp"
+#include "../sniffer/wifi_sniffer.hpp"
 
 #include <iostream>
 #include <nvs_flash.h>

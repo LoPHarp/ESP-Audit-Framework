@@ -1,6 +1,6 @@
 #pragma once
 
-#include "sniffer.h"
+#include "sniffer.hpp"
 
 #include <span>
 #include <optional>

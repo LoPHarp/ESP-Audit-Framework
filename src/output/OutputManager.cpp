@@ -1,4 +1,4 @@
-#include "OutputManager.h"
+#include "OutputManager.hpp"
 #include <utility>
 
 using namespace std;

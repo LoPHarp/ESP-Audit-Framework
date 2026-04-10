@@ -1,6 +1,6 @@
 #pragma once
 
-#include "IOutputTarget.h"
+#include "IOutputTarget.hpp"
 
 #include <vector>
 #include <memory>

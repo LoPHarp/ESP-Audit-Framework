@@ -1,5 +1,5 @@
-#include "core/core_application.h"
-#include "tests/test_manager.h"
+#include "core/core_application.hpp"
+#include "tests/test_manager.hpp"
 #include <memory>
 
 using namespace std;

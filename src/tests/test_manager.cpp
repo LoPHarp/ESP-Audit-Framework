@@ -1,6 +1,6 @@
-#include "test_manager.h"
-#include "mock_frames.h"
-#include "../sniffer/frame_parser.h"
+#include "test_manager.hpp"
+#include "mock_frames.hpp"
+#include "../sniffer/frame_parser.hpp"
 #include <iostream>
 #include <format>
 

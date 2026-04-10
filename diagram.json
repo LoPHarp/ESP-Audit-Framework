@@ -3,16 +3,34 @@
   "author": "LoPHarp",
   "editor": "wokwi",
   "parts": [
-    {
-      "type": "board-esp32-devkit-c-v4",
-      "id": "esp",
-      "top": 0,
-      "left": 0,
-      "attrs": {}
-    }
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-ili9341", "id": "tft", "top": 0, "left": 150, "attrs": {} },
+    { "type": "wokwi-pushbutton", "id": "btn_up", "top": 180, "left": 0, "attrs": { "color": "green", "label": "UP" } },
+    { "type": "wokwi-pushbutton", "id": "btn_down", "top": 230, "left": 0, "attrs": { "color": "green", "label": "DOWN" } },
+    { "type": "wokwi-pushbutton", "id": "btn_sel", "top": 205, "left": 50, "attrs": { "color": "blue", "label": "SEL" } },
+    { "type": "wokwi-pushbutton", "id": "btn_back", "top": 205, "left": -50, "attrs": { "color": "red", "label": "BACK" } }
   ],
   "connections": [
     [ "esp:TX", "$serialMonitor:RX", "", [] ],
-    [ "esp:RX", "$serialMonitor:TX", "", [] ]
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    
+    [ "esp:GND.1", "tft:GND", "black", [ "v0" ] ],
+    [ "esp:3V3", "tft:VCC", "red", [ "v0" ] ],
+    [ "esp:3V3", "tft:LED", "red", [ "v0" ] ],
+    [ "esp:15", "tft:CS", "orange", [ "v0" ] ],
+    [ "esp:4", "tft:RESET", "purple", [ "v0" ] ],
+    [ "esp:2", "tft:DC", "yellow", [ "v0" ] ],
+    [ "esp:23", "tft:MOSI", "blue", [ "v0" ] ],
+    [ "esp:18", "tft:SCK", "cyan", [ "v0" ] ],
+    [ "esp:19", "tft:MISO", "gray", [ "v0" ] ],
+
+    [ "esp:32", "btn_up:2.R", "green", [ "v0" ] ],
+    [ "esp:GND.2", "btn_up:1.R", "black", [ "v0" ] ],
+    [ "esp:33", "btn_down:2.R", "green", [ "v0" ] ],
+    [ "esp:GND.2", "btn_down:1.R", "black", [ "v0" ] ],
+    [ "esp:25", "btn_sel:2.R", "blue", [ "v0" ] ],
+    [ "esp:GND.3", "btn_sel:1.R", "black", [ "v0" ] ],
+    [ "esp:26", "btn_back:2.R", "red", [ "v0" ] ],
+    [ "esp:GND.3", "btn_back:1.R", "black", [ "v0" ] ]
   ]
 }
