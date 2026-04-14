@@ -13,22 +13,23 @@ public:
     LGFX_Config_ILI9341() 
     {
         auto cfg = _bus_instance.config();
-        cfg.spi_host = VSPI_HOST;
+        cfg.spi_host = SPI3_HOST;     
         cfg.spi_mode = 0;
-        cfg.freq_write = 40000000;
+        cfg.freq_write = 40000000;   
         cfg.freq_read  = 16000000;
         cfg.spi_3wire  = false;
         cfg.use_lock   = true;
-        cfg.dma_channel = 1;
+        cfg.dma_channel = SPI_DMA_CH_AUTO; 
         cfg.pin_sclk = 18;
         cfg.pin_mosi = 23;
         cfg.pin_miso = 19;
         cfg.pin_dc   = 2;
         _bus_instance.config(cfg);
-        _panel_instance.setBus(&_bus_instance);
+
+         _panel_instance.setBus(&_bus_instance);
 
         auto pcfg = _panel_instance.config();
-        pcfg.pin_cs   = 15;
+        pcfg.pin_cs   = 15;     
         pcfg.pin_rst  = 4;
         pcfg.pin_busy = -1;
         pcfg.panel_width  = 240;
@@ -58,7 +59,8 @@ public:
     void ClearScreen();
 
     void DrawHeader(std::string_view title);
-    void DrawListItem(uint8_t index, std::string_view ssid, std::string_view mac, int8_t rssi, bool isSelected);
+    void DrawMenuRow(uint8_t index, std::string_view text, bool isSelected);
+    void DrawNetworkRow(uint8_t index, std::string_view ssid, std::string_view mac, int8_t rssi, bool isSelected);
 
 private:
     DisplayDriver();

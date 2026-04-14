@@ -1,18 +1,18 @@
 #include "core_application.hpp"
-#include "../sniffer/wifi_sniffer.hpp"
+#include "MenuController.hpp"
+#include "../tests/test_manager.hpp"
 
-#include <iostream>
 #include <nvs_flash.h>
 #include <esp_wifi.h>
 #include <esp_netif.h>
 #include <esp_event.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 using namespace std;
 
 void CoreApplication::Initialize() 
 {
-    cout << "Initializing hardware and system services..." << endl;
-
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) 
     {
@@ -29,13 +29,16 @@ void CoreApplication::Initialize()
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 
-    cout << "System initialization completed successfully!" << endl;
+    TestManager::runAllTests(); // TODO: Не забути видалити запуск тестів
+
+    MenuController::GetInstance().Initialize();
 }
 
 void CoreApplication::Run()
 {
     while (true)
     {
-        vTaskDelay(1000 / portTICK_PERIOD_MS); 
+        MenuController::GetInstance().ProcessInput();
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }

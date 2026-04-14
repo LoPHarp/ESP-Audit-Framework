@@ -1,4 +1,5 @@
 #include "DisplayDriver.hpp"
+#include <iostream>
 
 using namespace std;
 
@@ -35,7 +36,23 @@ void DisplayDriver::DrawHeader(std::string_view title)
     tft_.drawFastHLine(0, 20, tft_.width(), TFT_GREEN);
 }
 
-void DisplayDriver::DrawListItem(uint8_t index, string_view ssid, string_view mac, int8_t rssi, bool isSelected)
+void DisplayDriver::DrawMenuRow(uint8_t index, string_view text, bool isSelected)
+{
+    int yPos = 25 + (index * 25);
+
+    uint16_t bgColor = isSelected ? TFT_GREEN : TFT_BLACK;
+    uint16_t fgColor = isSelected ? TFT_BLACK : TFT_GREEN;
+
+    tft_.fillRect(0, yPos, tft_.width(), 25, bgColor);
+    
+    tft_.setTextColor(fgColor);
+    tft_.setTextSize(2);
+    tft_.setCursor(5, yPos + 4);
+    
+    tft_.printf("%-15.*s", static_cast<int>(text.length()), text.data());
+}
+
+void DisplayDriver::DrawNetworkRow(uint8_t index, string_view ssid, string_view mac, int8_t rssi, bool isSelected)
 {
     int yPos = 25 + (index * 25);
 
@@ -50,7 +67,6 @@ void DisplayDriver::DrawListItem(uint8_t index, string_view ssid, string_view ma
     
     tft_.printf("%-15.*s", static_cast<int>(ssid.length()), ssid.data());
 
-    // 6 уровней сигнала вместо 4
     uint8_t bars = 0;
     if (rssi > -50) bars = 6;
     else if (rssi > -60) bars = 5;

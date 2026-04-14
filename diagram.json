@@ -17,7 +17,7 @@
     [ "esp:GND.1", "tft:GND", "black", [ "v0" ] ],
     [ "esp:3V3", "tft:VCC", "red", [ "v0" ] ],
     [ "esp:3V3", "tft:LED", "red", [ "v0" ] ],
-    [ "esp:15", "tft:CS", "orange", [ "v0" ] ],
+    [ "esp:5", "tft:CS", "orange", [ "v0" ] ],
     [ "esp:4", "tft:RESET", "purple", [ "v0" ] ],
     [ "esp:2", "tft:DC", "yellow", [ "v0" ] ],
     [ "esp:23", "tft:MOSI", "blue", [ "v0" ] ],

@@ -16,6 +16,7 @@
 *.elf
 *.map
 *.a
+sdkconfig.*
 
 # OS generated files
 Thumbs.db
