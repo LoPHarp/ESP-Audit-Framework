@@ -1,7 +1,9 @@
 #include "DisplayDriver.hpp"
-#include <iostream>
+#include "UkrFont.hpp"
 
 using namespace std;
+
+static const lgfx::U8g2font ukrFont(u8g2_font_unifont_t_cyrillic);
 
 DisplayDriver& DisplayDriver::GetInstance()
 {
@@ -28,10 +30,13 @@ void DisplayDriver::DrawHeader(std::string_view title)
 {
     tft_.fillRect(0, 0, tft_.width(), 20, tft_.color565(0, 100, 0));
     tft_.setTextColor(TFT_WHITE);
-    tft_.setTextSize(2);
-    tft_.setCursor(5, 2);
 
-    tft_.printf("%.*s", static_cast<int>(title.length()), title.data());
+    tft_.setFont(&ukrFont); 
+    tft_.setTextSize(1.0);
+    
+    tft_.setCursor(5, 3);
+    
+    tft_.print(std::string(title).c_str());
 
     tft_.drawFastHLine(0, 20, tft_.width(), TFT_GREEN);
 }
@@ -46,10 +51,12 @@ void DisplayDriver::DrawMenuRow(uint8_t index, string_view text, bool isSelected
     tft_.fillRect(0, yPos, tft_.width(), 25, bgColor);
     
     tft_.setTextColor(fgColor);
-    tft_.setTextSize(2);
-    tft_.setCursor(5, yPos + 4);
     
-    tft_.printf("%-15.*s", static_cast<int>(text.length()), text.data());
+    tft_.setFont(&ukrFont);
+    tft_.setTextSize(1.0); 
+
+    tft_.setCursor(5, yPos + 6);
+    tft_.print(std::string(text).c_str());
 }
 
 void DisplayDriver::DrawNetworkRow(uint8_t index, string_view ssid, string_view mac, int8_t rssi, bool isSelected)
