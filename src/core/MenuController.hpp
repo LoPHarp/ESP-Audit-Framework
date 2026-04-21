@@ -38,6 +38,8 @@ public:
     void Initialize();
     void ProcessInput();
 
+    void Update();
+
 private:
     MenuController();
     ~MenuController() = default;

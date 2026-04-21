@@ -1,4 +1,6 @@
 #include "MenuController.hpp"
+#include "../storage/AccessPointManager.hpp"
+#include "../sniffer/wifi_sniffer.hpp"
 
 using namespace std;
 
@@ -53,7 +55,12 @@ void MenuController::ProcessInput()
             if(currentState_ == MenuState::Main)
                 switch (selectedIndex_)
                 {
-                    case 0: ChangeState(MenuState::Recon_AP_List); break;
+                    case 0:
+                    {
+                        WifiSniffer::GetInstance().Start();
+                        ChangeState(MenuState::Recon_AP_List); 
+                        break;
+                    }
                     case 1: ChangeState(MenuState::Attack_Spam_Menu); break;
                     case 2: ChangeState(MenuState::Sniffer_Live); break;
                     case 3: ChangeState(MenuState::Settings_Main); break;
@@ -63,7 +70,10 @@ void MenuController::ProcessInput()
         case(InputEvent::Back):
         {
             if (currentState_ != MenuState::Main)
+            {
+                WifiSniffer::GetInstance().Stop();
                 ChangeState(MenuState::Main);
+            }
             break;
         }
         default:
@@ -76,10 +86,22 @@ void MenuController::ChangeState(MenuState newState)
     if (currentState_ != newState) selectedIndex_ = 0;
 
     currentState_ = newState;
+    DisplayDriver::GetInstance().ClearScreen();
 
     switch (currentState_)
     {
-        case MenuState::Main: RenderMainMenu(); break;
+        case MenuState::Main:
+        {
+            DisplayDriver::GetInstance().DrawHeader("ГОЛОВНЕ МЕНЮ"); 
+            RenderMainMenu(); 
+            break;
+        }
+        case MenuState::Recon_AP_List: 
+        {
+            DisplayDriver::GetInstance().DrawHeader("ЗНАЙДЕНІ МЕРЕЖІ");
+            RenderReconAPList(); 
+            break;
+        }
 
         default: break;
     }
@@ -96,9 +118,6 @@ void MenuController::RenderMainMenu()
 
     currentMenuSize_ = items.size();
 
-    DisplayDriver::GetInstance().ClearScreen();
-    DisplayDriver::GetInstance().DrawHeader("ГОЛОВНЕ МЕНЮ");
-
     for (size_t i = 0; i < items.size(); ++i)
     {
         DisplayDriver::GetInstance().DrawMenuRow(i, items[i], (i == selectedIndex_));
@@ -107,26 +126,59 @@ void MenuController::RenderMainMenu()
 
 void MenuController::RenderReconAPList()
 {
-    vector<string_view> items = {
-        "Starlink_5G",
-        "Guest_Network",
-        "Free_Public_WLAN"
-    };
-
+    APVVector items = AccessPointManager::GetInstance().GetNetworks();
     currentMenuSize_ = items.size();
 
-    DisplayDriver::GetInstance().ClearScreen();
-    DisplayDriver::GetInstance().DrawHeader("ЗНАЙДЕНІ МЕРЕЖІ");
+    if (items.empty()) return;
 
-    for (size_t i = 0; i < items.size(); ++i)
+    size_t displayLimit = min<size_t>(items.size(), 10);
+
+    for (size_t i = 0; i < displayLimit; ++i)
     {
-        int8_t fakeRssi = -40 - (i * 15);
-        DisplayDriver::GetInstance().DrawNetworkRow(
-            i, 
-            items[i], 
-            "00:11:22:33:44:55", 
-            fakeRssi, 
-            (i == selectedIndex_)
-        );
+        bool isSelected = (i == selectedIndex_);
+        visit([i, isSelected](const auto& AP) {
+            using T = decay_t<decltype(AP)>;
+            
+            if constexpr (is_same_v<T, BeaconFrame>)
+            {
+                DisplayDriver::GetInstance().DrawNetworkRow(i, AP.ssid, AP.base.source.toString(), AP.base.rssi, isSelected);
+            }
+            else if constexpr (is_same_v<T, ProbeRequestFrame>)
+            {
+                DisplayDriver::GetInstance().DrawNetworkRow(i, AP.ssid, AP.base.source.toString(), AP.base.rssi, isSelected);
+            }
+        }, items[i]);
+    }
+}
+
+void MenuController::Update()
+{
+    if(currentState_ != MenuState::Recon_AP_List)
+        return;
+
+    if(currentMenuSize_ != 0)
+        return;
+
+    static uint32_t lastTick = 0;
+    static uint8_t dotCount = 0;
+
+    uint32_t currentTick = xTaskGetTickCount();
+    
+    if(currentTick - lastTick > pdMS_TO_TICKS(500))
+    {
+        lastTick = currentTick;
+        
+        APVVector items = AccessPointManager::GetInstance().GetNetworks();
+        
+        if (items.empty())
+        {
+            static uint8_t dotCount = 0;
+            dotCount = (dotCount + 1) % 4;
+            DisplayDriver::GetInstance().DrawSearchingAnimation(dotCount);
+        }
+        else
+        {
+            RenderReconAPList();
+        }
     }
 }

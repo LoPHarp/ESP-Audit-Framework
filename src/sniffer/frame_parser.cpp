@@ -1,6 +1,7 @@
 #include "frame_parser.hpp"
 
 #include <cstring>
+#include <algorithm>
 
 using namespace std;
 
@@ -33,6 +34,7 @@ optional<FrameVariant> FrameParser::parse(span<const uint8_t> buffer, int8_t rss
     {
         BeaconFrame beacon;
         beacon.base = baseFrame;
+        memset(beacon.ssid, 0, sizeof(beacon.ssid));
 
         if(!parseBeaconTags(buffer.subspan(24), beacon))
             return nullopt;
@@ -43,6 +45,7 @@ optional<FrameVariant> FrameParser::parse(span<const uint8_t> buffer, int8_t rss
     {
         ProbeRequestFrame probe;
         probe.base = baseFrame;
+        memset(probe.ssid, 0, sizeof(probe.ssid));
 
         if(!parseProbeRequestTags(buffer.subspan(24), probe))
             return nullopt;
@@ -73,7 +76,11 @@ bool FrameParser::parseBeaconTags(span<const uint8_t> payload, BeaconFrame& beac
             return false;
 
         if(tagNumber == 0) // SSID
-            beacon.ssid = string(reinterpret_cast<const char*>(&payload[offset + 2]), tagLength);
+        {
+            size_t copyLen = min<size_t>(tagLength, 32);
+            memcpy(beacon.ssid, payload.data() + offset + 2, copyLen);
+            beacon.ssid[copyLen] = '\0';
+        }
         else if(tagNumber == 3 && tagLength == 1) // Channel
             beacon.channel = payload[offset + 2];
         
@@ -99,7 +106,11 @@ bool FrameParser::parseProbeRequestTags(span<const uint8_t> payload, ProbeReques
             return false;
 
         if(tagNumber == 0) // SSID
-            probe.ssid = string(reinterpret_cast<const char*>(&payload[offset + 2]), tagLength);
+        {
+            size_t copyLen = min<size_t>(tagLength, 32);
+            memcpy(probe.ssid, payload.data() + offset + 2, copyLen);
+            probe.ssid[copyLen] = '\0';
+        }
         
         offset += 2 + tagLength;
     }

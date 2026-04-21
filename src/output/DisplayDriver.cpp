@@ -1,6 +1,7 @@
 #include "DisplayDriver.hpp"
 #include "UkrFont.hpp"
 
+
 using namespace std;
 
 static const lgfx::U8g2font ukrFont(u8g2_font_unifont_t_cyrillic);
@@ -108,4 +109,23 @@ void DisplayDriver::DrawNetworkRow(uint8_t index, string_view ssid, string_view 
         int barHeight = 4 + (i * 3); 
         tft_.fillRect(xRssi + (i * 6), yPos + 20 - barHeight, 4, barHeight, color);
     }
+}
+
+void DisplayDriver::DrawSearchingAnimation(uint8_t dots)
+{
+    tft_.fillRect(0, 40, tft_.width(), 30, TFT_BLACK);
+    
+    tft_.setTextColor(TFT_WHITE);
+    tft_.setFont(&ukrFont);
+    tft_.setTextSize(1.0);
+    
+    string text = "Пошук мереж";
+    for(uint8_t i = 0; i < dots; ++i)
+        text += ".";
+
+    int textWidth = tft_.textWidth(text.c_str());
+    int xPos = (tft_.width() - textWidth) / 2;
+
+    tft_.setCursor(xPos, 50);
+    tft_.print(text.c_str());
 }

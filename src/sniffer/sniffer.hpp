@@ -2,12 +2,18 @@
 
 #include <cstdint>
 #include <string>
-#include <variant>
+#include <variant>  
+#include <cstring>
 
 struct MacAddress
 {
     uint8_t addr[6];
     std::string toString() const;
+
+    bool operator==(const MacAddress& other) const 
+    {
+        return memcmp(addr, other.addr, 6) == 0;
+    }
 };
 
 struct RawFrame
@@ -21,14 +27,24 @@ struct RawFrame
 struct BeaconFrame          // Фрейм, який розсилає точка доступу для оголошення своєї присутності
 {
     RawFrame base;
-    std::string ssid;
+    char ssid[33];
     uint8_t channel;
+
+    bool operator==(const BeaconFrame& other) const
+    {
+        return base.source == other.base.source;
+    }
 };
 
-struct ProbeRequestFrame    // Фрейм, який надсилає клієнт для пошуку доступних мереж Wi-Fi
+struct ProbeRequestFrame  
 {
     RawFrame base;
-    std::string ssid;
+    char ssid[33];
+
+    bool operator==(const ProbeRequestFrame& other) const
+    {
+        return base.source == other.base.source;
+    }
 };
 
 using FrameVariant = std::variant<BeaconFrame, ProbeRequestFrame>;

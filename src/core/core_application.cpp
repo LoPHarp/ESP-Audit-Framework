@@ -28,8 +28,7 @@ void CoreApplication::Initialize()
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-
-    TestManager::runAllTests(); // TODO: Не забути видалити запуск тестів
+    ESP_ERROR_CHECK(esp_wifi_start());
 
     MenuController::GetInstance().Initialize();
 }
@@ -39,6 +38,7 @@ void CoreApplication::Run()
     while (true)
     {
         MenuController::GetInstance().ProcessInput();
+        MenuController::GetInstance().Update();
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }

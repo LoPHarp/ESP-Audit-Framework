@@ -61,6 +61,7 @@ public:
     void DrawHeader(std::string_view title);
     void DrawMenuRow(uint8_t index, std::string_view text, bool isSelected);
     void DrawNetworkRow(uint8_t index, std::string_view ssid, std::string_view mac, int8_t rssi, bool isSelected);
+    void DrawSearchingAnimation(uint8_t dots);
 
 private:
     DisplayDriver();
