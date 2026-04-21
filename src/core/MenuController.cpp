@@ -10,7 +10,7 @@ MenuController& MenuController::GetInstance()
     return Instance;
 }
 
-MenuController::MenuController() : currentState_(MenuState::Main), selectedIndex_(0), currentMenuSize_(0) {}
+MenuController::MenuController() : currentState_(MenuState::Main), selectedIndex_(0), currentMenuSize_(0), viewOffset_(0) {}
 
 void MenuController::Initialize()
 {
@@ -18,7 +18,6 @@ void MenuController::Initialize()
     InputManager::GetInstance().Initalize();
 
     ChangeState(MenuState::Main);
-    GetInstance();
 }
 
 void MenuController::ProcessInput()
@@ -33,11 +32,18 @@ void MenuController::ProcessInput()
         {
             if(currentMenuSize_ > 0)
             {
-                if(selectedIndex_ == 0)
-                    selectedIndex_ = currentMenuSize_ - 1;
-                else
+                if(selectedIndex_ > 0)
                     selectedIndex_--;
-                ChangeState(currentState_);
+                else
+                    selectedIndex_ = currentMenuSize_ - 1;
+
+                if (selectedIndex_ < viewOffset_)
+                    viewOffset_ = selectedIndex_;
+                else if (selectedIndex_ == currentMenuSize_ - 1)
+                    viewOffset_ = (currentMenuSize_ > 8) ? currentMenuSize_ - 8 : 0;
+
+                if(currentState_ == MenuState::Main) RenderMainMenu();
+                else if(currentState_ == MenuState::Recon_AP_List) RenderReconAPList();
             }
             break;
         }
@@ -46,25 +52,32 @@ void MenuController::ProcessInput()
             if(currentMenuSize_ > 0)
             {
                 selectedIndex_ = (selectedIndex_ + 1) % currentMenuSize_;
-                ChangeState(currentState_);
+
+                if (selectedIndex_ >= viewOffset_ + 8)
+                    viewOffset_ = selectedIndex_ - 7;
+                else if (selectedIndex_ == 0)
+                    viewOffset_ = 0;
+
+                if(currentState_ == MenuState::Main) RenderMainMenu();
+                else if(currentState_ == MenuState::Recon_AP_List) RenderReconAPList();
             }
             break;
         }
         case(InputEvent::Select):
         {
             if(currentState_ == MenuState::Main)
+            {
                 switch (selectedIndex_)
                 {
-                    case 0:
-                    {
+                    case 0: 
                         WifiSniffer::GetInstance().Start();
                         ChangeState(MenuState::Recon_AP_List); 
                         break;
-                    }
                     case 1: ChangeState(MenuState::Attack_Spam_Menu); break;
                     case 2: ChangeState(MenuState::Sniffer_Live); break;
                     case 3: ChangeState(MenuState::Settings_Main); break;
                 }
+            }
             break;
         }
         case(InputEvent::Back):
@@ -76,33 +89,31 @@ void MenuController::ProcessInput()
             }
             break;
         }
-        default:
-            break;
+        default: break;
     }
 }
 
 void MenuController::ChangeState(MenuState newState)
 {
-    if (currentState_ != newState) selectedIndex_ = 0;
+    if (currentState_ != newState) 
+    {
+        selectedIndex_ = 0;
+        viewOffset_ = 0;
+        DisplayDriver::GetInstance().ClearScreen();
+    }
 
     currentState_ = newState;
-    DisplayDriver::GetInstance().ClearScreen();
 
     switch (currentState_)
     {
-        case MenuState::Main:
-        {
-            DisplayDriver::GetInstance().DrawHeader("ГОЛОВНЕ МЕНЮ"); 
+        case MenuState::Main: 
+            DisplayDriver::GetInstance().DrawHeader("ГОЛОВНЕ МЕНЮ");
             RenderMainMenu(); 
             break;
-        }
-        case MenuState::Recon_AP_List: 
-        {
+        case MenuState::Recon_AP_List:
             DisplayDriver::GetInstance().DrawHeader("ЗНАЙДЕНІ МЕРЕЖІ");
             RenderReconAPList(); 
             break;
-        }
-
         default: break;
     }
 }
@@ -131,11 +142,13 @@ void MenuController::RenderReconAPList()
 
     if (items.empty()) return;
 
-    size_t displayLimit = min<size_t>(items.size(), 10);
+    size_t displayCount = min<size_t>(currentMenuSize_ - viewOffset_, 8);
 
-    for (size_t i = 0; i < displayLimit; ++i)
+    for (size_t i = 0; i < displayCount; ++i)
     {
-        bool isSelected = (i == selectedIndex_);
+        size_t itemIndex = viewOffset_ + i;
+        bool isSelected = (itemIndex == selectedIndex_);
+        
         visit([i, isSelected](const auto& AP) {
             using T = decay_t<decltype(AP)>;
             
@@ -147,38 +160,38 @@ void MenuController::RenderReconAPList()
             {
                 DisplayDriver::GetInstance().DrawNetworkRow(i, AP.ssid, AP.base.source.toString(), AP.base.rssi, isSelected);
             }
-        }, items[i]);
+        }, items[itemIndex]);
     }
 }
 
 void MenuController::Update()
 {
-    if(currentState_ != MenuState::Recon_AP_List)
-        return;
+    if(currentState_ != MenuState::Recon_AP_List) return;
 
-    if(currentMenuSize_ != 0)
-        return;
+    static uint32_t lastDataVersion = 0;
+    static uint32_t lastDrawTick = 0;
 
-    static uint32_t lastTick = 0;
-    static uint8_t dotCount = 0;
-
+    uint32_t currentVersion = AccessPointManager::GetInstance().GetDataVersion();
     uint32_t currentTick = xTaskGetTickCount();
-    
-    if(currentTick - lastTick > pdMS_TO_TICKS(500))
+
+    if (currentVersion != lastDataVersion)
     {
-        lastTick = currentTick;
-        
-        APVVector items = AccessPointManager::GetInstance().GetNetworks();
-        
-        if (items.empty())
+        if (lastDrawTick == 0 || (currentTick - lastDrawTick > pdMS_TO_TICKS(1500)))
         {
+            lastDataVersion = currentVersion;
+            lastDrawTick = currentTick;
+            RenderReconAPList();
+        }
+    }
+    else if (currentMenuSize_ == 0)
+    {
+        static uint32_t lastDotTick = 0;
+        if(currentTick - lastDotTick > pdMS_TO_TICKS(500))
+        {
+            lastDotTick = currentTick;
             static uint8_t dotCount = 0;
             dotCount = (dotCount + 1) % 4;
             DisplayDriver::GetInstance().DrawSearchingAnimation(dotCount);
-        }
-        else
-        {
-            RenderReconAPList();
         }
     }
 }

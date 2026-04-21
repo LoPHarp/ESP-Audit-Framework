@@ -46,16 +46,13 @@ void WifiSniffer::promiscuous_rx_cb(void* buf, wifi_promiscuous_pkt_type_t type)
     if(type != WIFI_PKT_MGMT)
         return;
 
-#ifdef __INTELISENSE__
     auto* pkt = reinterpret_cast<wifi_promiscuous_pkt_t*>(buf);
-
     span<const uint8_t> payload(pkt->payload, pkt->rx_ctrl.sig_len);
 
     auto result = FrameParser::parse(payload, pkt->rx_ctrl.rssi);
     
     if(result)
         AccessPointManager::GetInstance().AddOrUpdateAccessPoint(result.value());
-#endif
 }
 
 void WifiSniffer::HopperTask(void* arg)

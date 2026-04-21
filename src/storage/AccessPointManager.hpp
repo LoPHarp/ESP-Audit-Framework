@@ -17,6 +17,7 @@ public:
     void Initalize();
 
     void AddOrUpdateAccessPoint(const APVariant& frame);
+    uint32_t GetDataVersion();
     APVVector GetNetworks();
 
 private:
@@ -26,6 +27,7 @@ private:
     AccessPointManager(const AccessPointManager&) = delete;
     AccessPointManager operator=(const AccessPointManager&) = delete;
 
+    uint32_t version_ = 0;
     APVVector AccessPoints;
     mutable mutex mtx_;
 };

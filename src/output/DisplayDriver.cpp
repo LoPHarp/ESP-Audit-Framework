@@ -68,47 +68,46 @@ void DisplayDriver::DrawNetworkRow(uint8_t index, string_view ssid, string_view 
     uint16_t fgColor = isSelected ? TFT_BLACK : TFT_GREEN;
 
     tft_.fillRect(0, yPos, tft_.width(), 25, bgColor);
-    
     tft_.setTextColor(fgColor);
-    tft_.setTextSize(2);
-    tft_.setCursor(5, yPos + 4);
+    tft_.setFont(&ukrFont); 
+    tft_.setTextSize(1.0);  
     
-    tft_.printf("%-15.*s", static_cast<int>(ssid.length()), ssid.data());
-
-    uint8_t bars = 0;
-    if (rssi > -50) bars = 6;
-    else if (rssi > -60) bars = 5;
-    else if (rssi > -70) bars = 4;
-    else if (rssi > -80) bars = 3;
-    else if (rssi > -90) bars = 2;
-    else if (rssi > -95) bars = 1;
-
-    int xRssi = tft_.width() - 45; 
-    
-    for (int i = 0; i < 6; ++i) 
+    string safeSsid = "";
+    if(ssid.empty())
+        safeSsid = "<Прихована>";
+    else
     {
-        uint16_t color;
-        if (i >= bars) 
-        {
-            color = isSelected ? tft_.color565(50, 50, 50) : tft_.color565(100, 100, 100);
-        } 
-        else 
-        {
-            if (isSelected) 
-            {
-                color = TFT_BLACK;
-            } 
-            else 
-            {
-                if (i < 2) color = TFT_RED;
-                else if (i < 4) color = TFT_YELLOW;
-                else color = TFT_GREEN;
-            }
-        }
-
-        int barHeight = 4 + (i * 3); 
-        tft_.fillRect(xRssi + (i * 6), yPos + 20 - barHeight, 4, barHeight, color);
+        size_t len = min<size_t>(ssid.length(), 11);
+        safeSsid = string(ssid.data(), len);
     }
+    
+    tft_.setCursor(5, yPos + 6);
+    tft_.print(safeSsid.c_str());
+
+    tft_.setCursor(125, yPos + 6);
+    tft_.print(string(mac).c_str());
+
+    int boxX = 270;
+    int boxY = yPos + 4;
+    
+    uint16_t borderColor = isSelected ? TFT_BLACK : TFT_WHITE;
+    tft_.drawRect(boxX, boxY, 45, 17, borderColor);
+    
+    uint16_t rssiColor;
+    if(rssi > -60) rssiColor = TFT_GREEN;
+    else if(rssi > -80) rssiColor = TFT_YELLOW;
+    else rssiColor = TFT_RED;
+
+    int fillWidth = (rssi + 100) * 43 / 60;
+    if(fillWidth < 0) fillWidth = 0;
+    if(fillWidth > 43) fillWidth = 43;
+    
+    if(fillWidth > 0)
+        tft_.fillRect(boxX + 1, boxY + 1, fillWidth, 15, rssiColor);
+        
+    tft_.setTextColor(tft_.color565(200, 200, 200));
+    tft_.setCursor(boxX + 6, boxY + 1);
+    tft_.printf("%d", rssi);
 }
 
 void DisplayDriver::DrawSearchingAnimation(uint8_t dots)

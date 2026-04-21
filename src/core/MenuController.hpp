@@ -50,6 +50,7 @@ private:
     MenuState currentState_;      
     uint8_t selectedIndex_;       
     uint8_t currentMenuSize_;     
+    size_t viewOffset_ = 0;
 
     void ChangeState(MenuState newState); 
     void RenderMainMenu();
