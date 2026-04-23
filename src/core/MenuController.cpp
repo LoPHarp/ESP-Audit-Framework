@@ -1,22 +1,19 @@
 #include "MenuController.hpp"
-#include "../storage/AccessPointManager.hpp"
 #include "../sniffer/wifi_sniffer.hpp"
 
 using namespace std;
 
 MenuController& MenuController::GetInstance()
 {
-    static MenuController Instance;
-    return Instance;
+    static MenuController instance;
+    return instance;
 }
-
-MenuController::MenuController() : currentState_(MenuState::Main), selectedIndex_(0), currentMenuSize_(0), viewOffset_(0) {}
 
 void MenuController::Initialize()
 {
-    DisplayDriver::GetInstance().Initialize();
-    InputManager::GetInstance().Initalize();
-
+    currentState_ = MenuState::Main;
+    selectedIndex_ = 0;
+    lastSelectedIndex_ = 255; 
     ChangeState(MenuState::Main);
 }
 
@@ -41,9 +38,6 @@ void MenuController::ProcessInput()
                     viewOffset_ = selectedIndex_;
                 else if (selectedIndex_ == currentMenuSize_ - 1)
                     viewOffset_ = (currentMenuSize_ > 8) ? currentMenuSize_ - 8 : 0;
-
-                if(currentState_ == MenuState::Main) RenderMainMenu();
-                else if(currentState_ == MenuState::Recon_AP_List) RenderReconAPList();
             }
             break;
         }
@@ -57,9 +51,6 @@ void MenuController::ProcessInput()
                     viewOffset_ = selectedIndex_ - 7;
                 else if (selectedIndex_ == 0)
                     viewOffset_ = 0;
-
-                if(currentState_ == MenuState::Main) RenderMainMenu();
-                else if(currentState_ == MenuState::Recon_AP_List) RenderReconAPList();
             }
             break;
         }
@@ -73,16 +64,43 @@ void MenuController::ProcessInput()
                         WifiSniffer::GetInstance().Start();
                         ChangeState(MenuState::Recon_AP_List); 
                         break;
-                    case 1: ChangeState(MenuState::Attack_Spam_Menu); break;
-                    case 2: ChangeState(MenuState::Sniffer_Live); break;
-                    case 3: ChangeState(MenuState::Settings_Main); break;
+                    case 1:
+                        WifiSniffer::GetInstance().Start();
+                        ChangeState(MenuState::Recon_Station_List);
+                        break;
+                    case 2: ChangeState(MenuState::Attack_Spam_Menu); break;
+                    case 3: ChangeState(MenuState::Sniffer_Live); break;
+                    case 4: ChangeState(MenuState::Settings_Main); break;
+                }
+            }
+            else if (currentState_ == MenuState::Recon_AP_List)
+            {
+                auto aps = AccessPointManager::GetInstance().GetAccessPoints();
+                if (selectedIndex_ + viewOffset_ < aps.size())
+                {
+                    selectedBSSID_ = aps[selectedIndex_ + viewOffset_].bssid;
+                    ChangeState(MenuState::Recon_AP_Clients);
+                }
+            }
+            else if (currentState_ == MenuState::Recon_AP_Clients)
+            {
+                // На кого націлені вектори
+                if (selectedIndex_ + viewOffset_ == 0) {
+                    // Користувач натиснув на саму точку доступу (Індекс 0)
+                    // TODO ChangeState(MenuState::Target_Action_Menu); // У майбутньому
+                } else {
+                    // TODO Користувач натиснув на клієнта
                 }
             }
             break;
         }
         case(InputEvent::Back):
         {
-            if (currentState_ != MenuState::Main)
+            if (currentState_ == MenuState::Recon_AP_Clients)
+            {
+                ChangeState(MenuState::Recon_AP_List);
+            }
+            else if (currentState_ != MenuState::Main)
             {
                 WifiSniffer::GetInstance().Stop();
                 ChangeState(MenuState::Main);
@@ -95,27 +113,51 @@ void MenuController::ProcessInput()
 
 void MenuController::ChangeState(MenuState newState)
 {
-    if (currentState_ != newState) 
-    {
-        selectedIndex_ = 0;
-        viewOffset_ = 0;
-        DisplayDriver::GetInstance().ClearScreen();
-    }
-
     currentState_ = newState;
+    selectedIndex_ = 0;
+    lastSelectedIndex_ = 255;
+    viewOffset_ = 0;
+    DisplayDriver::GetInstance().ClearScreen();
+}
+
+void MenuController::Update()
+{
+    auto& db = AccessPointManager::GetInstance();
+    auto& disp = DisplayDriver::GetInstance();
+    
+    uint32_t currentDataVersion = db.GetDataVersion();
+    
+    bool needRedraw = (selectedIndex_ != lastSelectedIndex_) || (currentDataVersion != lastDataVersion_);
+    
+    if (!needRedraw) return;
+
+    // TODO заглушка, додати час, заряд, назву поточного меню 
+    disp.DrawStatusBar("ESP-AUDIT", 0.85f, "18:25");
 
     switch (currentState_)
     {
-        case MenuState::Main: 
-            DisplayDriver::GetInstance().DrawHeader("ГОЛОВНЕ МЕНЮ");
-            RenderMainMenu(); 
+        case MenuState::Main:
+            RenderMainMenu();
             break;
+
         case MenuState::Recon_AP_List:
-            DisplayDriver::GetInstance().DrawHeader("ЗНАЙДЕНІ МЕРЕЖІ");
-            RenderReconAPList(); 
+            RenderReconAPList();
             break;
-        default: break;
+
+        case MenuState::Recon_AP_Clients:
+            RenderReconAPClients();
+            break;
+
+        case MenuState::Recon_Station_List:
+            RenderReconStationList();
+            break;
+            
+        default:
+            break;
     }
+
+    lastSelectedIndex_ = selectedIndex_;
+    lastDataVersion_ = currentDataVersion;
 }
 
 void MenuController::RenderMainMenu()
@@ -137,61 +179,102 @@ void MenuController::RenderMainMenu()
 
 void MenuController::RenderReconAPList()
 {
-    APVVector items = AccessPointManager::GetInstance().GetNetworks();
-    currentMenuSize_ = items.size();
+    auto& db = AccessPointManager::GetInstance();
+    auto& disp = DisplayDriver::GetInstance();
+    
+    auto aps = db.GetAccessPoints();
+    currentMenuSize_ = aps.size();
 
-    if (items.empty()) return;
-
-    size_t displayCount = min<size_t>(currentMenuSize_ - viewOffset_, 8);
-
-    for (size_t i = 0; i < displayCount; ++i)
+    if (aps.empty())
     {
-        size_t itemIndex = viewOffset_ + i;
-        bool isSelected = (itemIndex == selectedIndex_);
+        disp.DrawSearchingAnimation( (xTaskGetTickCount() / 500) % 4, 0 );
+        return;
+    }
+
+    for (uint8_t i = 0; i < 8 && (i + viewOffset_) < aps.size(); ++i)
+    {
+        auto& ap = aps[i + viewOffset_];
+        bool isSelected = (i == selectedIndex_);
         
-        visit([i, isSelected](const auto& AP) {
-            using T = decay_t<decltype(AP)>;
-            
-            if constexpr (is_same_v<T, BeaconFrame>)
-            {
-                DisplayDriver::GetInstance().DrawNetworkRow(i, AP.ssid, AP.base.source.toString(), AP.base.rssi, isSelected);
-            }
-            else if constexpr (is_same_v<T, ProbeRequestFrame>)
-            {
-                DisplayDriver::GetInstance().DrawNetworkRow(i, AP.ssid, AP.base.source.toString(), AP.base.rssi, isSelected);
-            }
-        }, items[itemIndex]);
+        // Малюємо рядок. forceFullRedraw = true, якщо це перший вхід або рух курсора
+        bool force = (lastSelectedIndex_ == 255) || (i == selectedIndex_) || (i == lastSelectedIndex_);
+        
+        // Отримуємо кількість клієнтів для цієї ТД
+        size_t clientCount = db.GetStationsForAP(ap.bssid).size();
+        
+        disp.DrawAPRow(i, ap.ssid, ap.channel, clientCount, ap.rssi, isSelected, force);
     }
 }
 
-void MenuController::Update()
+void MenuController::RenderReconAPClients()
 {
-    if(currentState_ != MenuState::Recon_AP_List) return;
-
-    static uint32_t lastDataVersion = 0;
-    static uint32_t lastDrawTick = 0;
-
-    uint32_t currentVersion = AccessPointManager::GetInstance().GetDataVersion();
-    uint32_t currentTick = xTaskGetTickCount();
-
-    if (currentVersion != lastDataVersion)
-    {
-        if (lastDrawTick == 0 || (currentTick - lastDrawTick > pdMS_TO_TICKS(1500)))
-        {
-            lastDataVersion = currentVersion;
-            lastDrawTick = currentTick;
-            RenderReconAPList();
+    auto& db = AccessPointManager::GetInstance();
+    auto& disp = DisplayDriver::GetInstance();
+    
+    auto clients = db.GetStationsForAP(selectedBSSID_);
+    
+    AccessPoint currentAP;
+    string apName = "Unknown";
+    for(auto& ap : db.GetAccessPoints()) {
+        if(ap.bssid == selectedBSSID_) {
+            currentAP = ap;
+            apName = ap.ssid;
+            break;
         }
     }
-    else if (currentMenuSize_ == 0)
+
+    disp.DrawStatusBar(apName, 0.85f, "18:25");
+
+    currentMenuSize_ = clients.size() + 1;
+
+    for (uint8_t i = 0; i < 8 && (i + viewOffset_) < currentMenuSize_; ++i)
     {
-        static uint32_t lastDotTick = 0;
-        if(currentTick - lastDotTick > pdMS_TO_TICKS(500))
+        size_t actualIndex = i + viewOffset_;
+        bool isSelected = (i == selectedIndex_);
+        bool force = (lastSelectedIndex_ == 255) || (i == selectedIndex_) || (i == lastSelectedIndex_);
+        
+        if (actualIndex == 0)
         {
-            lastDotTick = currentTick;
-            static uint8_t dotCount = 0;
-            dotCount = (dotCount + 1) % 4;
-            DisplayDriver::GetInstance().DrawSearchingAnimation(dotCount);
+            disp.DrawStationRow(i, currentAP.bssid.toString(), " [TARGET AP] ", currentAP.rssi, isSelected, force);
         }
+        else
+        {
+            auto& st = clients[actualIndex - 1];
+            disp.DrawAPClientRow(i, st.mac.toString(), st.lastSeen, st.rssi, isSelected, force);
+        }
+    }
+
+    if (clients.empty())
+    {
+        disp.DrawSearchingAnimation( (xTaskGetTickCount() / 500) % 4, 1 );
+    }
+}
+
+void MenuController::RenderReconStationList()
+{
+    auto& db = AccessPointManager::GetInstance();
+    auto& disp = DisplayDriver::GetInstance();
+    
+    auto allStations = db.GetAllStations();
+    currentMenuSize_ = allStations.size();
+
+    for (uint8_t i = 0; i < 8 && (i + viewOffset_) < allStations.size(); ++i)
+    {
+        auto& st = allStations[i + viewOffset_];
+        bool isSelected = (i == selectedIndex_);
+        bool force = (lastSelectedIndex_ == 255) || (i == selectedIndex_) || (i == lastSelectedIndex_);
+        
+        string apName = "[Шукає...]";
+        auto aps = db.GetAccessPoints();
+        for(auto& ap : aps)
+        {
+            if(ap.bssid == st.bssid)
+            {
+                apName = ap.ssid;
+                break;
+            }
+        }
+
+        disp.DrawStationRow(i, st.mac.toString(), apName, st.rssi, isSelected, force);
     }
 }

@@ -17,7 +17,7 @@ void WifiSniffer::Start()
     isRunning_ = true;
 
     wifi_promiscuous_filter_t filter = {};
-    filter.filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT;
+    filter.filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT | WIFI_PROMIS_FILTER_MASK_DATA;
     esp_wifi_set_promiscuous_filter(&filter);
 
     esp_wifi_set_promiscuous_rx_cb(promiscuous_rx_cb);
@@ -43,16 +43,32 @@ void WifiSniffer::Stop()
 
 void WifiSniffer::promiscuous_rx_cb(void* buf, wifi_promiscuous_pkt_type_t type)
 {
-    if(type != WIFI_PKT_MGMT)
+    if(type != WIFI_PKT_MGMT && type != WIFI_PKT_DATA)
         return;
 
+#ifdef __ZAGLUSHKA__
     auto* pkt = reinterpret_cast<wifi_promiscuous_pkt_t*>(buf);
     span<const uint8_t> payload(pkt->payload, pkt->rx_ctrl.sig_len);
 
     auto result = FrameParser::parse(payload, pkt->rx_ctrl.rssi);
     
     if(result)
-        AccessPointManager::GetInstance().AddOrUpdateAccessPoint(result.value());
+    {
+        auto& frameVariant = result.value();
+        
+        if (auto* beacon = std::get_if<BeaconFrame>(&frameVariant))
+        {
+            if (beacon->ssid[0] != '\0') 
+            {
+                AccessPointManager::GetInstance().AddOrUpdateAP(beacon->base.bssid, beacon->ssid, beacon->base.rssi, beacon->channel);
+            }
+        }
+        else if (auto* data = std::get_if<DataFrame>(&frameVariant))
+        {
+            AccessPointManager::GetInstance().AddOrUpdateStation(data->base.source, data->base.bssid, data->base.rssi);
+        }
+    }
+#endif
 }
 
 void WifiSniffer::HopperTask(void* arg)

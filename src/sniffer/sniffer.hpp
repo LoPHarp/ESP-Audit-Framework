@@ -36,7 +36,7 @@ struct BeaconFrame          // Фрейм, який розсилає точка 
     }
 };
 
-struct ProbeRequestFrame  
+struct ProbeRequestFrame    // Фрейм від різних пристроїв телефони/роботи пилесоси/розумні часи
 {
     RawFrame base;
     char ssid[33];
@@ -47,4 +47,9 @@ struct ProbeRequestFrame
     }
 };
 
-using FrameVariant = std::variant<BeaconFrame, ProbeRequestFrame>;
+struct DataFrame
+{
+    RawFrame base;
+};
+
+using FrameVariant = std::variant<BeaconFrame, ProbeRequestFrame, DataFrame>;

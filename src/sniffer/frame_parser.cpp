@@ -13,10 +13,10 @@ optional<FrameVariant> FrameParser::parse(span<const uint8_t> buffer, int8_t rss
     uint8_t type = (buffer[0] >> 2) & 0x03;
     uint8_t subtype = (buffer[0] >> 4) & 0x0F;
 
-    if(type != 0)
+    if(type != 0 && type != 2)
         return nullopt;
 
-    if(subtype != 8 && subtype !=4)
+    if(type == 0 && (subtype != 8 && subtype !=4))
         return nullopt;
 
     MacAddress dst, src, bssid;
@@ -29,6 +29,13 @@ optional<FrameVariant> FrameParser::parse(span<const uint8_t> buffer, int8_t rss
     baseFrame.source = src;
     baseFrame.bssid = bssid;
     baseFrame.rssi = rssi;
+
+    if(type == 2)
+    {
+        DataFrame data;
+        data.base = baseFrame;
+        return FrameVariant{data};
+    }
 
     if(subtype == 8)
     {

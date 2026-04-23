@@ -1,33 +1,52 @@
 #pragma once 
 
+#include <cstdint>
+#include <vector>
+#include <mutex>
 #include "../sniffer/sniffer.hpp"
 
-#include <vector>
-#include <variant>
-#include <mutex>
+struct Station
+{
+    MacAddress mac;
+    MacAddress bssid;
+    int8_t rssi;
+    uint32_t lastSeen;
+};
 
-using namespace std;
-using APVariant = variant<BeaconFrame, ProbeRequestFrame>;
-using APVVector = std::vector<APVariant>;
+struct AccessPoint
+{
+    MacAddress bssid;
+    char ssid[33];
+    int8_t rssi;
+    uint8_t channel;
+    uint32_t lastSeen;
+};
 
 class AccessPointManager
 {
 public:
     static AccessPointManager& GetInstance();
-    void Initalize();
+    void Initialize();
 
-    void AddOrUpdateAccessPoint(const APVariant& frame);
-    uint32_t GetDataVersion();
-    APVVector GetNetworks();
+    void AddOrUpdateAP(const MacAddress& bssid, const char* ssid, int8_t rssi, uint8_t channel);
+    void AddOrUpdateStation(const MacAddress& stationMac, const MacAddress& bssid, int8_t rssi);
+
+    std::vector<AccessPoint> GetAccessPoints();
+    std::vector<Station> GetStationsForAP(const MacAddress& bssid);
+    std::vector<Station> GetAllStations();
+
+    uint32_t GetDataVersion() const;
 
 private:
-    AccessPointManager();
+    AccessPointManager() = default;
     ~AccessPointManager() = default;
 
     AccessPointManager(const AccessPointManager&) = delete;
-    AccessPointManager operator=(const AccessPointManager&) = delete;
+    AccessPointManager& operator=(const AccessPointManager&) = delete;
 
+    std::vector<AccessPoint> accessPoints_;
+    std::vector<Station> stations_;
+
+    mutable std::mutex mtx_;
     uint32_t version_ = 0;
-    APVVector AccessPoints;
-    mutable mutex mtx_;
 };

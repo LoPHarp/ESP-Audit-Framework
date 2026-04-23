@@ -1,7 +1,6 @@
 #include "DisplayDriver.hpp"
 #include "UkrFont.hpp"
 
-
 using namespace std;
 
 static const lgfx::U8g2font ukrFont(u8g2_font_unifont_t_cyrillic);
@@ -27,19 +26,31 @@ void DisplayDriver::ClearScreen()
     tft_.fillScreen(TFT_BLACK);
 }
 
-void DisplayDriver::DrawHeader(std::string_view title)
+void DisplayDriver::DrawStatusBar(string_view title, float battery, string_view time)
 {
-    tft_.fillRect(0, 0, tft_.width(), 20, tft_.color565(0, 100, 0));
-    tft_.setTextColor(TFT_WHITE);
+    tft_.fillRect(0, 0, tft_.width(), 22, tft_.color565(0, 60, 0));
+    tft_.drawFastHLine(0, 22, tft_.width(), TFT_GREEN);
 
-    tft_.setFont(&ukrFont); 
+    tft_.setFont(&ukrFont);
     tft_.setTextSize(1.0);
-    
-    tft_.setCursor(5, 3);
-    
-    tft_.print(std::string(title).c_str());
+    tft_.setTextColor(TFT_WHITE, tft_.color565(0, 60, 0));
 
-    tft_.drawFastHLine(0, 20, tft_.width(), TFT_GREEN);
+    tft_.setCursor(5, 3);
+    tft_.print(string(title).c_str());
+
+    int timeWidth = tft_.textWidth(time.data());
+    tft_.setCursor((tft_.width() - timeWidth) / 2, 3);
+    tft_.print(string(time).c_str());
+
+    int batPercent = (int)(battery * 100);
+    uint16_t batColor = (batPercent < 20) ? TFT_RED : (batPercent < 50 ? TFT_YELLOW : TFT_GREEN);
+    
+    tft_.setTextColor(batColor, tft_.color565(0, 60, 0));
+    tft_.setCursor(tft_.width() - 55, 3);
+    tft_.printf("%d%%", batPercent);
+    
+    tft_.drawRect(tft_.width() - 20, 5, 15, 10, batColor);
+    tft_.fillRect(tft_.width() - 20, 5, (int)(15 * battery), 10, batColor);
 }
 
 void DisplayDriver::DrawMenuRow(uint8_t index, string_view text, bool isSelected)
@@ -60,59 +71,100 @@ void DisplayDriver::DrawMenuRow(uint8_t index, string_view text, bool isSelected
     tft_.print(std::string(text).c_str());
 }
 
-void DisplayDriver::DrawNetworkRow(uint8_t index, string_view ssid, string_view mac, int8_t rssi, bool isSelected)
+void DisplayDriver::DrawAPRow(uint8_t index, string_view ssid, uint8_t channel, size_t clients, int8_t rssi, bool isSelected, bool forceFullRedraw)
 {
     int yPos = 25 + (index * 25);
-
     uint16_t bgColor = isSelected ? TFT_GREEN : TFT_BLACK;
-    uint16_t fgColor = isSelected ? TFT_BLACK : TFT_GREEN;
+    uint16_t fgColor = isSelected ? TFT_BLACK : TFT_WHITE;
 
-    tft_.fillRect(0, yPos, tft_.width(), 25, bgColor);
-    tft_.setTextColor(fgColor);
-    tft_.setFont(&ukrFont); 
-    tft_.setTextSize(1.0);  
-    
-    string safeSsid = "";
-    if(ssid.empty())
-        safeSsid = "<Прихована>";
-    else
+    if (forceFullRedraw)
     {
-        size_t len = min<size_t>(ssid.length(), 11);
-        safeSsid = string(ssid.data(), len);
+        tft_.fillRect(0, yPos, tft_.width(), 25, bgColor);
     }
-    
+
+    tft_.setFont(&ukrFont);
+    tft_.setTextColor(fgColor, bgColor);
+
     tft_.setCursor(5, yPos + 6);
-    tft_.print(safeSsid.c_str());
+    string safeSsid = ssid.empty() ? "<Прихована>" : string(ssid.substr(0, 15));
+    tft_.printf("%-15s", safeSsid.c_str());
 
-    tft_.setCursor(125, yPos + 6);
-    tft_.print(string(mac).c_str());
+    tft_.setCursor(155, yPos + 6);
+    tft_.printf("CH:%-2d  C:%-2d", channel, clients);
 
-    int boxX = 270;
-    int boxY = yPos + 4;
-    
-    uint16_t borderColor = isSelected ? TFT_BLACK : TFT_WHITE;
-    tft_.drawRect(boxX, boxY, 45, 17, borderColor);
-    
-    uint16_t rssiColor;
-    if(rssi > -60) rssiColor = TFT_GREEN;
-    else if(rssi > -80) rssiColor = TFT_YELLOW;
-    else rssiColor = TFT_RED;
-
-    int fillWidth = (rssi + 100) * 43 / 60;
-    if(fillWidth < 0) fillWidth = 0;
-    if(fillWidth > 43) fillWidth = 43;
-    
-    if(fillWidth > 0)
-        tft_.fillRect(boxX + 1, boxY + 1, fillWidth, 15, rssiColor);
-        
-    tft_.setTextColor(tft_.color565(200, 200, 200));
-    tft_.setCursor(boxX + 6, boxY + 1);
-    tft_.printf("%d", rssi);
+    uint16_t rssiColor = isSelected ? TFT_BLACK : (rssi < -80 ? TFT_RED : (rssi < -65 ? TFT_YELLOW : TFT_GREEN));
+    tft_.setTextColor(rssiColor, bgColor);
+    tft_.setCursor(280, yPos + 6);
+    tft_.printf("%3d", rssi);
 }
 
-void DisplayDriver::DrawSearchingAnimation(uint8_t dots)
+void DisplayDriver::DrawAPClientRow(uint8_t index, string_view mac, uint32_t lastSeenTick, int8_t rssi, bool isSelected, bool forceFullRedraw)
 {
-    tft_.fillRect(0, 40, tft_.width(), 30, TFT_BLACK);
+    int yPos = 25 + (index * 25);
+    uint16_t bgColor = isSelected ? TFT_GREEN : TFT_BLACK;
+    uint16_t fgColor = isSelected ? TFT_BLACK : TFT_WHITE;
+
+    if (forceFullRedraw)
+    {
+        tft_.fillRect(0, yPos, tft_.width(), 25, bgColor);
+    }
+
+    tft_.setFont(&ukrFont);
+    tft_.setTextColor(fgColor, bgColor);
+    
+    tft_.setCursor(5, yPos + 6);
+    tft_.printf("%-17s", string(mac).c_str()); 
+
+    tft_.setCursor(160, yPos + 6);
+    uint32_t currentTick = xTaskGetTickCount();
+    uint32_t ageSeconds = (currentTick - lastSeenTick) / configTICK_RATE_HZ;
+    
+    if (ageSeconds < 60)
+        tft_.printf("Актив:%-2luс ", ageSeconds);
+    else if (ageSeconds < 3600)
+        tft_.printf("Актив:%-2luхв", ageSeconds / 60);
+    else
+        tft_.printf("Давно...   ");
+
+    uint16_t rssiColor = isSelected ? TFT_BLACK : (rssi < -80 ? TFT_RED : (rssi < -65 ? TFT_YELLOW : TFT_GREEN));
+    tft_.setTextColor(rssiColor, bgColor);
+    tft_.setCursor(285, yPos + 6);
+    tft_.printf("%3d", rssi);
+}
+
+void DisplayDriver::DrawStationRow(uint8_t index, string_view mac, string_view apSsid, int8_t rssi, bool isSelected, bool forceFullRedraw)
+{
+    int yPos = 25 + (index * 25);
+    uint16_t bgColor = isSelected ? TFT_GREEN : TFT_BLACK;
+    uint16_t fgColor = isSelected ? TFT_BLACK : TFT_WHITE; 
+
+    if (forceFullRedraw)
+    {
+        tft_.fillRect(0, yPos, tft_.width(), 25, bgColor);
+    }
+
+    tft_.setFont(&ukrFont); 
+    tft_.setTextColor(fgColor, bgColor);
+    
+    tft_.setCursor(5, yPos + 6);
+    tft_.print(string(mac).c_str());
+
+    tft_.setCursor(155, yPos + 6);
+    string safeSsid = apSsid.empty() ? "[Шукає...]" : string(apSsid.substr(0, 14));
+    tft_.printf("%-14s", safeSsid.c_str());
+
+    uint16_t rssiColor = isSelected ? TFT_BLACK : (rssi < -80 ? TFT_RED : (rssi < -65 ? TFT_YELLOW : TFT_GREEN));
+    
+    tft_.setTextColor(rssiColor, bgColor);
+    tft_.setCursor(285, yPos + 6);
+    tft_.printf("%3d", rssi);
+}
+
+void DisplayDriver::DrawSearchingAnimation(uint8_t dots, uint8_t rowIndex)
+{
+    int yPos = 25 + (rowIndex * 25);
+    
+    tft_.fillRect(0, yPos, tft_.width(), 25, TFT_BLACK);
     
     tft_.setTextColor(TFT_WHITE);
     tft_.setFont(&ukrFont);

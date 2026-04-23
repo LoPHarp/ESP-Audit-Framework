@@ -58,10 +58,12 @@ public:
     void Initialize();
     void ClearScreen();
 
-    void DrawHeader(std::string_view title);
+    void DrawStatusBar(std::string_view title, float battery, std::string_view time);
     void DrawMenuRow(uint8_t index, std::string_view text, bool isSelected);
-    void DrawNetworkRow(uint8_t index, std::string_view ssid, std::string_view mac, int8_t rssi, bool isSelected);
-    void DrawSearchingAnimation(uint8_t dots);
+    void DrawAPRow(uint8_t index, std::string_view ssid, uint8_t channel, size_t clients, int8_t rssi, bool isSelected, bool forceFullRedraw);
+    void DrawAPClientRow(uint8_t index, std::string_view mac, uint32_t lastSeenTick, int8_t rssi, bool isSelected, bool forceFullRedraw);
+    void DrawStationRow(uint8_t index, std::string_view mac, std::string_view apSsid, int8_t rssi, bool isSelected, bool forceFullRedraw);
+    void DrawSearchingAnimation(uint8_t dots, uint8_t rowIndex);
 
 private:
     DisplayDriver();
