@@ -57,6 +57,7 @@ public:
 
     void Initialize();
     void ClearScreen();
+    void ResetState();
 
     void DrawStatusBar(std::string_view title, float battery, std::string_view time);
     void DrawMenuRow(uint8_t index, std::string_view text, bool isSelected);
@@ -64,13 +65,18 @@ public:
     void DrawAPClientRow(uint8_t index, std::string_view mac, uint32_t lastSeenTick, int8_t rssi, bool isSelected, bool forceFullRedraw);
     void DrawStationRow(uint8_t index, std::string_view mac, std::string_view apSsid, int8_t rssi, bool isSelected, bool forceFullRedraw);
     void DrawSearchingAnimation(uint8_t dots, uint8_t rowIndex);
-
+    
 private:
     DisplayDriver();
     ~DisplayDriver() = default;
 
     DisplayDriver(const DisplayDriver&) = delete;
     DisplayDriver& operator=(const DisplayDriver&) = delete;
+
+    std::string lastTitle_;
+    std::string lastTime_;
+    float lastBattery_ = -1.0f;
+    uint8_t lastAnimDots_ = 255;
 
     LGFX_Config_ILI9341 tft_;
 };

@@ -15,7 +15,7 @@ InputManager& InputManager::GetInstance()
 
 InputManager::InputManager() : event_queue_(nullptr) {}
 
-void InputManager::Initalize()
+void InputManager::Initialize()
 {
     gpio_config_t io_conf = {};
     io_conf.intr_type = GPIO_INTR_DISABLE;

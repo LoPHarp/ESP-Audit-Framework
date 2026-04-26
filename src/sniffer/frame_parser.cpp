@@ -65,31 +65,32 @@ optional<FrameVariant> FrameParser::parse(span<const uint8_t> buffer, int8_t rss
 
 bool FrameParser::parseBeaconTags(span<const uint8_t> payload, BeaconFrame& beacon)
 {
-    if(payload.size() < 12)
+    if(payload.size() < 16)
         return false;
 
     beacon.channel = 0;
     size_t offset = 12;
+    size_t fcs_length = 4;
 
-    while(offset < payload.size())
+    while(offset + 1 < (payload.size() - fcs_length))
     {
-        if(offset + 1 >= payload.size())
-            return false;
-
-        uint8_t tagNumber = payload[offset];
         uint8_t tagLength = payload[offset + 1];
 
-        if((offset + 2 + tagLength) > payload.size())
-            return false;
+        if ((offset + 2 + tagLength) > (payload.size() - fcs_length))
+            break;
 
-        if(tagNumber == 0) // SSID
+        uint8_t tagNumber = payload[offset];
+
+        if (tagNumber == 0)
         {
             size_t copyLen = min<size_t>(tagLength, 32);
             memcpy(beacon.ssid, payload.data() + offset + 2, copyLen);
             beacon.ssid[copyLen] = '\0';
         }
-        else if(tagNumber == 3 && tagLength == 1) // Channel
+        else if (tagNumber == 3 && tagLength == 1)
+        {
             beacon.channel = payload[offset + 2];
+        }
         
         offset += 2 + tagLength;
     }
@@ -100,19 +101,18 @@ bool FrameParser::parseBeaconTags(span<const uint8_t> payload, BeaconFrame& beac
 bool FrameParser::parseProbeRequestTags(span<const uint8_t> payload, ProbeRequestFrame& probe)
 {
     size_t offset = 0;
+    size_t fcs_length = 4;
 
-    while(offset < payload.size())
+    while(offset + 1 < (payload.size() - fcs_length))
     {
-        if(offset + 1 >= payload.size())
-            return false;
-
-        uint8_t tagNumber = payload[offset];
         uint8_t tagLength = payload[offset + 1];
 
-        if((offset + 2 + tagLength) > payload.size())
-            return false;
+        if ((offset + 2 + tagLength) > (payload.size() - fcs_length))
+            break;
 
-        if(tagNumber == 0) // SSID
+        uint8_t tagNumber = payload[offset];
+        
+        if (tagNumber == 0)
         {
             size_t copyLen = min<size_t>(tagLength, 32);
             memcpy(probe.ssid, payload.data() + offset + 2, copyLen);

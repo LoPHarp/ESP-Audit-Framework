@@ -46,7 +46,7 @@ void WifiSniffer::promiscuous_rx_cb(void* buf, wifi_promiscuous_pkt_type_t type)
     if(type != WIFI_PKT_MGMT && type != WIFI_PKT_DATA)
         return;
 
-#ifdef __ZAGLUSHKA__
+//#ifdef __ZAGLUSHKA__
     auto* pkt = reinterpret_cast<wifi_promiscuous_pkt_t*>(buf);
     span<const uint8_t> payload(pkt->payload, pkt->rx_ctrl.sig_len);
 
@@ -68,7 +68,7 @@ void WifiSniffer::promiscuous_rx_cb(void* buf, wifi_promiscuous_pkt_type_t type)
             AccessPointManager::GetInstance().AddOrUpdateStation(data->base.source, data->base.bssid, data->base.rssi);
         }
     }
-#endif
+//#endif
 }
 
 void WifiSniffer::HopperTask(void* arg)

@@ -94,27 +94,51 @@ uint32_t AccessPointManager::GetDataVersion() const
 
 vector<AccessPoint> AccessPointManager::GetAccessPoints()
 {
-    scoped_lock lock(mtx_);
-    return accessPoints_;
+    vector<AccessPoint> copy;
+    
+    {
+        scoped_lock lock(mtx_);
+        copy = accessPoints_; 
+    }
+
+    sort(copy.begin(), copy.end(), [](const AccessPoint& a, const AccessPoint& b){
+        return a.rssi > b.rssi; 
+    });
+
+    return copy;
 }
 
 vector<Station> AccessPointManager::GetAllStations()
 {
-    scoped_lock lock(mtx_);
-    return stations_;
+    vector<Station> copy;
+    {
+        scoped_lock lock(mtx_);
+        copy = stations_;
+    }
+    
+    sort(copy.begin(), copy.end(), [](const Station& a, const Station& b){
+        return a.rssi > b.rssi;
+    });
+
+    return copy;
 }
 
 vector<Station> AccessPointManager::GetStationsForAP(const MacAddress& bssid)
 {
-    scoped_lock lock(mtx_);
     vector<Station> result;
     
-    for (const auto& st : stations_)
     {
-        if (st.bssid == bssid)
+        scoped_lock lock(mtx_);
+        for (const auto& st : stations_)
         {
-            result.push_back(st);
+            if (st.bssid == bssid)
+                result.push_back(st);
         }
     }
+
+    sort(result.begin(), result.end(), [](const Station& a, const Station& b){
+        return a.rssi > b.rssi;
+    });
+
     return result;
 }

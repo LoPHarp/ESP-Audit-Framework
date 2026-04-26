@@ -117,7 +117,11 @@ void MenuController::ChangeState(MenuState newState)
     selectedIndex_ = 0;
     lastSelectedIndex_ = 255;
     viewOffset_ = 0;
+    lastViewOffset_ = 0;
+    currentMenuSize_ = 0;
+    lastMenuSize_ = 0;
     DisplayDriver::GetInstance().ClearScreen();
+    DisplayDriver::GetInstance().ResetState();
 }
 
 void MenuController::Update()
@@ -126,21 +130,26 @@ void MenuController::Update()
     auto& disp = DisplayDriver::GetInstance();
     
     uint32_t currentDataVersion = db.GetDataVersion();
+    uint32_t currentTick = xTaskGetTickCount();
     
-    bool needRedraw = (selectedIndex_ != lastSelectedIndex_) || (currentDataVersion != lastDataVersion_);
+    static uint32_t lastUiUpdateTick = 0;
     
-    if (!needRedraw) return;
+    bool cursorMoved = (selectedIndex_ != lastSelectedIndex_);
+    bool dataChanged = (currentDataVersion != lastDataVersion_);
+    bool timeToUpdate = (currentTick - lastUiUpdateTick) > pdMS_TO_TICKS(1000); 
 
-    // TODO заглушка, додати час, заряд, назву поточного меню 
-    disp.DrawStatusBar("ESP-AUDIT", 0.85f, "18:25");
+    if (!cursorMoved && !(dataChanged && timeToUpdate)) 
+        return;
 
     switch (currentState_)
     {
         case MenuState::Main:
+            disp.DrawStatusBar("ГОЛОВНЕ МЕНЮ", 0.85f, "18:25");
             RenderMainMenu();
             break;
 
         case MenuState::Recon_AP_List:
+            disp.DrawStatusBar("ТОЧКИ ДОСТУПУ", 0.85f, "18:25");
             RenderReconAPList();
             break;
 
@@ -149,6 +158,7 @@ void MenuController::Update()
             break;
 
         case MenuState::Recon_Station_List:
+            disp.DrawStatusBar("ГЛОБАЛЬНИЙ ПОШУК", 0.85f, "18:25");
             RenderReconStationList();
             break;
             
@@ -157,13 +167,21 @@ void MenuController::Update()
     }
 
     lastSelectedIndex_ = selectedIndex_;
-    lastDataVersion_ = currentDataVersion;
+    lastViewOffset_ = viewOffset_; 
+    lastMenuSize_ = currentMenuSize_;
+    
+    if (dataChanged && timeToUpdate) 
+    {
+        lastDataVersion_ = currentDataVersion;
+        lastUiUpdateTick = currentTick;
+    }
 }
 
 void MenuController::RenderMainMenu()
 {
     vector<string_view> items = {
-        "Розвідка (Scan)",
+        "Пошук мереж (AP)",
+        "Пошук пристроїв (STA)",
         "Масові атаки",
         "Сніфер",
         "Налаштування"
@@ -187,21 +205,25 @@ void MenuController::RenderReconAPList()
 
     if (aps.empty())
     {
-        disp.DrawSearchingAnimation( (xTaskGetTickCount() / 500) % 4, 0 );
+        disp.DrawSearchingAnimation( (pdTICKS_TO_MS(xTaskGetTickCount()) / 1000) % 4, 0 );
         return;
     }
 
     for (uint8_t i = 0; i < 8 && (i + viewOffset_) < aps.size(); ++i)
     {
         auto& ap = aps[i + viewOffset_];
-        bool isSelected = (i == selectedIndex_);
+
+        size_t absoluteIndex = i + viewOffset_;
+        bool isSelected = (absoluteIndex == selectedIndex_);
         
-        // Малюємо рядок. forceFullRedraw = true, якщо це перший вхід або рух курсора
-        bool force = (lastSelectedIndex_ == 255) || (i == selectedIndex_) || (i == lastSelectedIndex_);
-        
-        // Отримуємо кількість клієнтів для цієї ТД
+        bool cursorMoved = (selectedIndex_ != lastSelectedIndex_);
+        bool viewMoved = (viewOffset_ != lastViewOffset_);
+        bool isNewRow = (absoluteIndex >= lastMenuSize_);
+
+        bool force = (lastSelectedIndex_ == 255) || viewMoved || isNewRow || 
+                     (isSelected && cursorMoved) || (absoluteIndex == lastSelectedIndex_ && cursorMoved);
+
         size_t clientCount = db.GetStationsForAP(ap.bssid).size();
-        
         disp.DrawAPRow(i, ap.ssid, ap.channel, clientCount, ap.rssi, isSelected, force);
     }
 }
@@ -230,12 +252,20 @@ void MenuController::RenderReconAPClients()
     for (uint8_t i = 0; i < 8 && (i + viewOffset_) < currentMenuSize_; ++i)
     {
         size_t actualIndex = i + viewOffset_;
-        bool isSelected = (i == selectedIndex_);
-        bool force = (lastSelectedIndex_ == 255) || (i == selectedIndex_) || (i == lastSelectedIndex_);
+        size_t absoluteIndex = i + viewOffset_;
+        bool isSelected = (absoluteIndex == selectedIndex_);
+        
+        bool cursorMoved = (selectedIndex_ != lastSelectedIndex_);
+        bool viewMoved = (viewOffset_ != lastViewOffset_);
+        bool isNewRow = (absoluteIndex >= lastMenuSize_);
+
+        bool force = (lastSelectedIndex_ == 255) || viewMoved || isNewRow || 
+                     (isSelected && cursorMoved) || (absoluteIndex == lastSelectedIndex_ && cursorMoved);
+
         
         if (actualIndex == 0)
         {
-            disp.DrawStationRow(i, currentAP.bssid.toString(), " [TARGET AP] ", currentAP.rssi, isSelected, force);
+            disp.DrawStationRow(i, currentAP.bssid.toString(), " [ЦІЛЬОВА ТД] ", currentAP.rssi, isSelected, force);
         }
         else
         {
@@ -245,9 +275,7 @@ void MenuController::RenderReconAPClients()
     }
 
     if (clients.empty())
-    {
-        disp.DrawSearchingAnimation( (xTaskGetTickCount() / 500) % 4, 1 );
-    }
+        disp.DrawSearchingAnimation( (pdTICKS_TO_MS(xTaskGetTickCount()) / 1000) % 4, 1 );
 }
 
 void MenuController::RenderReconStationList()
@@ -261,9 +289,17 @@ void MenuController::RenderReconStationList()
     for (uint8_t i = 0; i < 8 && (i + viewOffset_) < allStations.size(); ++i)
     {
         auto& st = allStations[i + viewOffset_];
-        bool isSelected = (i == selectedIndex_);
-        bool force = (lastSelectedIndex_ == 255) || (i == selectedIndex_) || (i == lastSelectedIndex_);
+        size_t absoluteIndex = i + viewOffset_;
+        bool isSelected = (absoluteIndex == selectedIndex_);
         
+        bool cursorMoved = (selectedIndex_ != lastSelectedIndex_);
+        bool viewMoved = (viewOffset_ != lastViewOffset_);
+        bool isNewRow = (absoluteIndex >= lastMenuSize_);
+
+        bool force = (lastSelectedIndex_ == 255) || viewMoved || isNewRow || 
+                     (isSelected && cursorMoved) || (absoluteIndex == lastSelectedIndex_ && cursorMoved);
+
+
         string apName = "[Шукає...]";
         auto aps = db.GetAccessPoints();
         for(auto& ap : aps)

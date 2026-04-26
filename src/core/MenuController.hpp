@@ -43,6 +43,9 @@ private:
     uint8_t currentMenuSize_;     
     size_t viewOffset_ = 0;
     
+    size_t lastViewOffset_ = 0;
+    uint8_t lastMenuSize_ = 0;
+
     uint32_t lastDataVersion_ = 0;
     MacAddress selectedBSSID_;   
 

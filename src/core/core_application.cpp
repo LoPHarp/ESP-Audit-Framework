@@ -30,6 +30,9 @@ void CoreApplication::Initialize()
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_start());
 
+    DisplayDriver::GetInstance().Initialize();
+    AccessPointManager::GetInstance().Initialize();
+    InputManager::GetInstance().Initialize(); 
     MenuController::GetInstance().Initialize();
 }
 

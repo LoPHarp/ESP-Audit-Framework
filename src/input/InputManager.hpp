@@ -18,7 +18,7 @@ class InputManager
 public:
     static InputManager& GetInstance();
 
-    void Initalize();
+    void Initialize();
     InputEvent GetEvent(TickType_t wait_ticks = 0);
 private:
     InputManager();
