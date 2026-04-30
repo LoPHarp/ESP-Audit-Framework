@@ -66,6 +66,8 @@ public:
     void DrawStationRow(uint8_t index, std::string_view mac, std::string_view apSsid, int8_t rssi, bool isSelected, bool forceFullRedraw);
     void DrawSearchingAnimation(uint8_t dots, uint8_t rowIndex);
     
+    void DrawAttackTelemetry(std::string_view targetMac, uint8_t channel, uint32_t packetsSent, bool forceFullRedraw);
+
 private:
     DisplayDriver();
     ~DisplayDriver() = default;
@@ -79,4 +81,7 @@ private:
     uint8_t lastAnimDots_ = 255;
 
     LGFX_Config_ILI9341 tft_;
+
+    uint32_t lastPacketsSent_ = 0xFFFFFFFF;
+    uint8_t lastChannel_ = 0xFF;
 };

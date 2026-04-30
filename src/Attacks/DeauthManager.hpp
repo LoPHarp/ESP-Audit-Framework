@@ -20,12 +20,15 @@ class DeauthManager
 public:
     static DeauthManager& GetInstance();
 
-    void SendDeauthPacket(const MacAddress& apMac, const MacAddress& clientMac, uint16_t reasonCode = 7);
+    void SendDeauthPacket(const MacAddress& dest, const MacAddress& src, const MacAddress& bssid, uint16_t reasonCode = 7);
 
     void StartAttack(AttackMode mode, const MacAddress& apMac = {0}, uint8_t channel = 1, const MacAddress& clientMac = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
     void StopAttack();
-    bool IsAttacking() const;
+    bool IsAttacking() const { return isAttacking_.load(); }
 
+    uint32_t GetPacketsSent() const { return packetsSent_.load(); }
+    AttackMode GetCurrentMode() const { return currentMode_; }
+    uint8_t GetTargetChannel() const { return targetChannel_; }
 private:
     DeauthManager() = default;
     ~DeauthManager() = default;
@@ -41,4 +44,6 @@ private:
     MacAddress targetClient_;
     uint8_t targetChannel_{1};
     TaskHandle_t attackTaskHandle_{nullptr};
+
+    std::atomic<uint32_t> packetsSent_{0};
 };

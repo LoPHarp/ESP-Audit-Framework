@@ -1,5 +1,6 @@
 #include "MenuController.hpp"
 #include "../sniffer/wifi_sniffer.hpp"
+#include "../attacks/DeauthManager.hpp"
 
 using namespace std;
 
@@ -56,54 +57,152 @@ void MenuController::ProcessInput()
         }
         case(InputEvent::Select):
         {
-            if(currentState_ == MenuState::Main)
+            switch (currentState_)
             {
-                switch (selectedIndex_)
+                case MenuState::Main:
+                    switch (selectedIndex_)
+                    {
+                        case 0: 
+                            WifiSniffer::GetInstance().Start();
+                            ChangeState(MenuState::Recon_AP_List); 
+                            break;
+                        case 1:
+                            WifiSniffer::GetInstance().Start();
+                            ChangeState(MenuState::Recon_Station_List);
+                            break;
+                        case 2:
+                            WifiSniffer::GetInstance().Start(); 
+                            ChangeState(MenuState::Mass_Attacks_Menu); 
+                            break;
+                        case 3: ChangeState(MenuState::Sniffer_Live); break;
+                        case 4: ChangeState(MenuState::Settings_Main); break;
+                    }
+                    break;
+                case MenuState::Recon_AP_List:
                 {
-                    case 0: 
-                        WifiSniffer::GetInstance().Start();
-                        ChangeState(MenuState::Recon_AP_List); 
-                        break;
-                    case 1:
-                        WifiSniffer::GetInstance().Start();
-                        ChangeState(MenuState::Recon_Station_List);
-                        break;
-                    case 2: ChangeState(MenuState::Attack_Spam_Menu); break;
-                    case 3: ChangeState(MenuState::Sniffer_Live); break;
-                    case 4: ChangeState(MenuState::Settings_Main); break;
+                    auto aps = AccessPointManager::GetInstance().GetAccessPoints();
+                    if (selectedIndex_ + viewOffset_ < aps.size())
+                    {
+                        selectedBSSID_ = aps[selectedIndex_ + viewOffset_].bssid;
+                        ChangeState(MenuState::Recon_AP_Clients);
+                    }
+                    break;
                 }
-            }
-            else if (currentState_ == MenuState::Recon_AP_List)
-            {
-                auto aps = AccessPointManager::GetInstance().GetAccessPoints();
-                if (selectedIndex_ + viewOffset_ < aps.size())
+                case MenuState::Recon_Station_List:
                 {
-                    selectedBSSID_ = aps[selectedIndex_ + viewOffset_].bssid;
-                    ChangeState(MenuState::Recon_AP_Clients);
+                    auto allStations = AccessPointManager::GetInstance().GetAllStations();
+                    if (selectedIndex_ + viewOffset_ < allStations.size())
+                    {
+                        auto& st = allStations[selectedIndex_ + viewOffset_];
+                        selectedClientMAC_ = st.mac;
+                        selectedBSSID_ = st.bssid;
+                        isTargetingAP_ = false;
+                        previousReconState_ = MenuState::Recon_Station_List;
+                        ChangeState(MenuState::Target_Action_Menu);
+                    }
+                    break;
                 }
-            }
-            else if (currentState_ == MenuState::Recon_AP_Clients)
-            {
-                // На кого націлені вектори
-                if (selectedIndex_ + viewOffset_ == 0) {
-                    // Користувач натиснув на саму точку доступу (Індекс 0)
-                    // TODO ChangeState(MenuState::Target_Action_Menu); // У майбутньому
-                } else {
-                    // TODO Користувач натиснув на клієнта
+                case MenuState::Mass_Attacks_Menu:
+                    if (selectedIndex_ == 0)
+                    {
+                        DeauthManager::GetInstance().StartAttack(AttackMode::GlobalSpam);
+                        previousReconState_ = MenuState::Mass_Attacks_Menu; 
+                        ChangeState(MenuState::Attack_Spam_Menu);
+                    }
+                    break;
+                case MenuState::Recon_AP_Clients:
+                {
+                    auto clients = AccessPointManager::GetInstance().GetStationsForAP(selectedBSSID_);
+                    
+                    if (selectedIndex_ + viewOffset_ == 0) 
+                    {
+                        isTargetingAP_ = true;
+                        previousReconState_ = MenuState::Recon_AP_Clients;
+                        ChangeState(MenuState::Target_Action_Menu);
+                    } 
+                    else 
+                    {
+                        size_t clientIndex = selectedIndex_ + viewOffset_ - 1;
+                        if (clientIndex < clients.size())
+                        {
+                            isTargetingAP_ = false;
+                            selectedClientMAC_ = clients[clientIndex].mac;
+                            previousReconState_ = MenuState::Recon_AP_Clients;
+                            ChangeState(MenuState::Target_Action_Menu);
+                        }
+                    }
+                    break;
                 }
+                case MenuState::Target_Action_Menu:
+                {
+                    uint8_t targetChannel = 1;
+                    auto aps = AccessPointManager::GetInstance().GetAccessPoints();
+                    for (const auto& ap : aps)
+                    {
+                        if (ap.bssid == selectedBSSID_)
+                        {
+                            targetChannel = ap.channel;
+                            break;
+                        }
+                    }
+
+                    if (selectedIndex_ == 0)
+                    {
+                        if (isTargetingAP_)
+                            DeauthManager::GetInstance().StartAttack(AttackMode::BroadcastAP, selectedBSSID_, targetChannel);
+                        else
+                            DeauthManager::GetInstance().StartAttack(AttackMode::SingleTarget, selectedBSSID_, targetChannel, selectedClientMAC_);
+                        
+                        ChangeState(previousReconState_); // Повернення туди, звідки прийшли
+                    }
+                    else if (selectedIndex_ == 1)
+                    {
+                        if (isTargetingAP_)
+                            DeauthManager::GetInstance().StartAttack(AttackMode::SpamAP, selectedBSSID_, targetChannel);
+                        else
+                            DeauthManager::GetInstance().StartAttack(AttackMode::SpamTarget, selectedBSSID_, targetChannel, selectedClientMAC_);
+                            
+                        ChangeState(MenuState::Attack_Spam_Menu);
+                    }
+                    break;
+                }
+                case MenuState::Attack_Spam_Menu:
+                    DeauthManager::GetInstance().StopAttack();
+                    ChangeState(previousReconState_);
+                    break;
+
+                default: break;
             }
             break;
         }
         case(InputEvent::Back):
         {
-            if (currentState_ == MenuState::Recon_AP_Clients)
+            switch (currentState_)
             {
-                ChangeState(MenuState::Recon_AP_List);
-            }
-            else if (currentState_ != MenuState::Main)
-            {
-                WifiSniffer::GetInstance().Stop();
-                ChangeState(MenuState::Main);
+                case MenuState::Recon_AP_Clients:
+                    ChangeState(MenuState::Recon_AP_List);
+                    break;
+
+                case MenuState::Mass_Attacks_Menu:
+                    ChangeState(MenuState::Main);
+                    break;
+
+                case MenuState::Target_Action_Menu:
+                    ChangeState(previousReconState_);
+                    break;
+
+                case MenuState::Attack_Spam_Menu:
+                    DeauthManager::GetInstance().StopAttack();
+                    ChangeState(previousReconState_);
+                    break;
+
+                case MenuState::Main:
+                    break;
+
+                default:
+                    WifiSniffer::GetInstance().Stop();
+                    ChangeState(MenuState::Main);
+                    break;
             }
             break;
         }
@@ -136,9 +235,13 @@ void MenuController::Update()
     
     bool cursorMoved = (selectedIndex_ != lastSelectedIndex_);
     bool dataChanged = (currentDataVersion != lastDataVersion_);
-    bool timeToUpdate = (currentTick - lastUiUpdateTick) > pdMS_TO_TICKS(1000); 
+    
+    bool dbTimeToUpdate = (currentTick - lastUiUpdateTick) > pdMS_TO_TICKS(1000); 
+    bool attackTimeToUpdate = (currentState_ == MenuState::Attack_Spam_Menu) && ((currentTick - lastUiUpdateTick) > pdMS_TO_TICKS(300));
 
-    if (!cursorMoved && !(dataChanged && timeToUpdate)) 
+    bool needDbUpdate = (dataChanged && dbTimeToUpdate);
+
+    if (!cursorMoved && !needDbUpdate && !attackTimeToUpdate) 
         return;
 
     switch (currentState_)
@@ -161,16 +264,30 @@ void MenuController::Update()
             disp.DrawStatusBar("ГЛОБАЛЬНИЙ ПОШУК", 0.85f, "18:25");
             RenderReconStationList();
             break;
-            
-        default:
+        
+        case MenuState::Target_Action_Menu:
+            disp.DrawStatusBar("ВИБІР АТАКИ", 0.85f, "18:25");
+            RenderTargetActionMenu();
             break;
+
+        case MenuState::Mass_Attacks_Menu:
+            disp.DrawStatusBar("МАСОВІ АТАКИ", 0.85f, "18:25");
+            RenderMassAttacksMenu();
+            break;
+
+        case MenuState::Attack_Spam_Menu:
+            disp.DrawStatusBar("АТАКА...", 0.85f, "18:25");
+            RenderAttackScreen();
+            break;
+            
+        default: break;
     }
 
     lastSelectedIndex_ = selectedIndex_;
     lastViewOffset_ = viewOffset_; 
     lastMenuSize_ = currentMenuSize_;
     
-    if (dataChanged && timeToUpdate) 
+    if (needDbUpdate || attackTimeToUpdate) 
     {
         lastDataVersion_ = currentDataVersion;
         lastUiUpdateTick = currentTick;
@@ -314,3 +431,73 @@ void MenuController::RenderReconStationList()
         disp.DrawStationRow(i, st.mac.toString(), apName, st.rssi, isSelected, force);
     }
 }
+
+void MenuController::RenderTargetActionMenu()
+{
+    vector<string_view> items = {
+        "Один пакет (Deauth)",
+        "Спам (Deauth)"
+    };
+
+    currentMenuSize_ = items.size();
+
+    for (size_t i = 0; i < items.size(); ++i)
+    {
+        DisplayDriver::GetInstance().DrawMenuRow(i, items[i], (i == selectedIndex_));
+    }
+}
+
+void MenuController::RenderAttackScreen()
+{
+    auto& disp = DisplayDriver::GetInstance();
+    auto& deauth = DeauthManager::GetInstance();
+    
+    bool forceFullRedraw = (lastSelectedIndex_ == 255);
+
+    if (deauth.GetCurrentMode() == AttackMode::GlobalSpam)
+    {
+        string targetMacStr = "ГЛОБАЛЬНИЙ СПАМ (Всі ТД)";
+        uint8_t currentChannel = deauth.GetTargetChannel(); 
+        uint32_t packets = deauth.GetPacketsSent();
+
+        disp.DrawAttackTelemetry(targetMacStr, currentChannel, packets, forceFullRedraw);
+    }
+    else 
+    {
+        uint8_t targetChannel = 1;
+        auto aps = AccessPointManager::GetInstance().GetAccessPoints();
+        for (const auto& ap : aps)
+        {
+            if (ap.bssid == selectedBSSID_)
+            {
+                targetChannel = ap.channel;
+                break;
+            }
+        }
+
+        string targetMacStr;
+        if (isTargetingAP_)
+            targetMacStr = "Broadcast (Всі клієнти)";
+        else
+            targetMacStr = selectedClientMAC_.toString();
+
+        uint32_t packets = deauth.GetPacketsSent();
+
+        disp.DrawAttackTelemetry(targetMacStr, targetChannel, packets, forceFullRedraw);
+    }
+}
+
+void MenuController::RenderMassAttacksMenu()
+{
+    vector<string_view> items = {
+        "Глобальний спам (Всі ТД)"
+    };
+
+    currentMenuSize_ = items.size();
+
+    for (size_t i = 0; i < items.size(); ++i)
+    {
+        DisplayDriver::GetInstance().DrawMenuRow(i, items[i], (i == selectedIndex_));
+    }
+}
+

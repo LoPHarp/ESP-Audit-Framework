@@ -1,5 +1,6 @@
 #include "wifi_sniffer.hpp"
 #include "../storage/AccessPointManager.hpp"
+#include "../attacks/DeauthManager.hpp"
 
 #include <iostream>
 
@@ -76,10 +77,12 @@ void WifiSniffer::HopperTask(void* arg)
     uint8_t channel = 1;
     while (true)
     {
-        esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
-        
-        channel++;
-        if (channel > 13) channel = 1;
+        if (!DeauthManager::GetInstance().IsAttacking())
+        {
+            esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
+            channel++;
+            if (channel > 13) channel = 1;
+        }
 
         vTaskDelay(pdMS_TO_TICKS(150));
     }

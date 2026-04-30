@@ -14,6 +14,7 @@ enum class MenuState
     Recon_AP_Clients,      
     Recon_Station_List,
     Target_Action_Menu,
+    Mass_Attacks_Menu,
     Attack_Spam_Menu,
     Sniffer_Live,
     Settings_Main,
@@ -42,17 +43,29 @@ private:
     uint8_t lastSelectedIndex_;   
     uint8_t currentMenuSize_;     
     size_t viewOffset_ = 0;
-    
+
     size_t lastViewOffset_ = 0;
     uint8_t lastMenuSize_ = 0;
 
     uint32_t lastDataVersion_ = 0;
     MacAddress selectedBSSID_;   
 
+    bool isTargetingAP_ = false;
+    MacAddress selectedClientMAC_;
+    MenuState previousReconState_ = MenuState::Recon_AP_Clients;
+
     void ChangeState(MenuState newState); 
     
     void RenderMainMenu();
+ 
     void RenderReconAPList();
-    void RenderReconAPClients();  
     void RenderReconStationList();
+    void RenderMassAttacksMenu();
+
+    void RenderReconAPClients();
+
+    void RenderTargetActionMenu();
+    void RenderAttackScreen();
+
+    
 };

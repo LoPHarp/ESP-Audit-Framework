@@ -210,3 +210,51 @@ void DisplayDriver::DrawSearchingAnimation(uint8_t dots, uint8_t rowIndex)
     tft_.setCursor(xPos, yPos + 6); 
     tft_.print(text.c_str());
 }
+
+void DisplayDriver::DrawAttackTelemetry(string_view targetMac, uint8_t channel, uint32_t packetsSent, bool forceFullRedraw)
+{
+    if (forceFullRedraw)
+    {
+        tft_.fillRect(0, 25, tft_.width(), tft_.height() - 25, TFT_BLACK);
+        
+        tft_.setFont(&ukrFont);
+        tft_.setTextSize(1.0);
+        
+        tft_.setTextColor(TFT_RED, TFT_BLACK);
+        tft_.setCursor(10, 40);
+        tft_.print(">> АКТИВНА АТАКА: СПАМ <<");
+        
+        tft_.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft_.setCursor(10, 75);
+        tft_.printf("ЦІЛЬ:  %s", string(targetMac).c_str());
+        
+        tft_.setCursor(10, 100);
+        tft_.print("КАНАЛ: ");
+
+        tft_.setCursor(10, 135);
+        tft_.print("ВІДПРАВЛЕНО:");
+        
+        lastChannel_ = 0xFF;
+    }
+
+    if (forceFullRedraw || channel != lastChannel_)
+    {
+        tft_.setFont(&ukrFont);
+        tft_.setTextSize(1.0);
+        tft_.setTextColor(TFT_YELLOW, TFT_BLACK); 
+        tft_.setCursor(65, 100); 
+        tft_.printf("%-2d", channel);
+        lastChannel_ = channel;
+    }
+
+    if (forceFullRedraw || packetsSent != lastPacketsSent_)
+    {
+        tft_.setFont(&ukrFont);
+        tft_.setTextSize(1.0);
+        tft_.setTextColor(TFT_GREEN, TFT_BLACK); 
+        tft_.setCursor(130, 135); 
+        tft_.printf("%-6lu", packetsSent); 
+        
+        lastPacketsSent_ = packetsSent;
+    }
+}
