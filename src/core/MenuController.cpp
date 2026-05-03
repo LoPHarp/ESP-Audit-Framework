@@ -1,6 +1,7 @@
 #include "MenuController.hpp"
 #include "../sniffer/wifi_sniffer.hpp"
 #include "../attacks/DeauthManager.hpp"
+#include "../attacks/BeaconSpamManager.hpp"
 
 using namespace std;
 
@@ -109,6 +110,12 @@ void MenuController::ProcessInput()
                         previousReconState_ = MenuState::Mass_Attacks_Menu; 
                         ChangeState(MenuState::Attack_Spam_Menu);
                     }
+                    else if (selectedIndex_ == 1)
+                    {
+                        BeaconSpamManager::GetInstance().Start();
+                        previousReconState_ = MenuState::Mass_Attacks_Menu; 
+                        ChangeState(MenuState::Attack_Spam_Menu);
+                    }
                     break;
                 case MenuState::Recon_AP_Clients:
                 {
@@ -153,7 +160,7 @@ void MenuController::ProcessInput()
                         else
                             DeauthManager::GetInstance().StartAttack(AttackMode::SingleTarget, selectedBSSID_, targetChannel, selectedClientMAC_);
                         
-                        ChangeState(previousReconState_); // Повернення туди, звідки прийшли
+                        ChangeState(previousReconState_);
                     }
                     else if (selectedIndex_ == 1)
                     {
@@ -162,6 +169,11 @@ void MenuController::ProcessInput()
                         else
                             DeauthManager::GetInstance().StartAttack(AttackMode::SpamTarget, selectedBSSID_, targetChannel, selectedClientMAC_);
                             
+                        ChangeState(MenuState::Attack_Spam_Menu);
+                    }
+                    else if (selectedIndex_ == 2)
+                    {
+                        BeaconSpamManager::GetInstance().Start(targetChannel);
                         ChangeState(MenuState::Attack_Spam_Menu);
                     }
                     break;
@@ -193,6 +205,7 @@ void MenuController::ProcessInput()
 
                 case MenuState::Attack_Spam_Menu:
                     DeauthManager::GetInstance().StopAttack();
+                    BeaconSpamManager::GetInstance().Stop();
                     ChangeState(previousReconState_);
                     break;
 
@@ -436,7 +449,8 @@ void MenuController::RenderTargetActionMenu()
 {
     vector<string_view> items = {
         "Один пакет (Deauth)",
-        "Спам (Deauth)"
+        "Спам (Deauth)",
+        "Beacon Spam (Канал цілі)"
     };
 
     currentMenuSize_ = items.size();
@@ -451,8 +465,19 @@ void MenuController::RenderAttackScreen()
 {
     auto& disp = DisplayDriver::GetInstance();
     auto& deauth = DeauthManager::GetInstance();
+    auto& beaconSpam = BeaconSpamManager::GetInstance();
     
     bool forceFullRedraw = (lastSelectedIndex_ == 255);
+
+    if (beaconSpam.IsActive())
+    {
+        string targetMacStr = "ГЕНЕРАЦІЯ ФЕЙКІВ (Beacon)";
+        uint8_t currentChannel = beaconSpam.GetTargetChannel(); 
+        uint32_t packets = beaconSpam.GetPacketsSent();
+
+        disp.DrawAttackTelemetry(targetMacStr, currentChannel, packets, forceFullRedraw);
+        return;
+    }
 
     if (deauth.GetCurrentMode() == AttackMode::GlobalSpam)
     {
@@ -490,7 +515,8 @@ void MenuController::RenderAttackScreen()
 void MenuController::RenderMassAttacksMenu()
 {
     vector<string_view> items = {
-        "Глобальний спам (Всі ТД)"
+        "Глобальний спам (Deauth)",
+        "Beacon Spam (Всі канали)"
     };
 
     currentMenuSize_ = items.size();
