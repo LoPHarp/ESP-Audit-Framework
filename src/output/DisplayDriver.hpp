@@ -65,8 +65,10 @@ public:
     void DrawAPClientRow(uint8_t index, std::string_view mac, uint32_t lastSeenTick, int8_t rssi, bool isSelected, bool forceFullRedraw);
     void DrawStationRow(uint8_t index, std::string_view mac, std::string_view apSsid, int8_t rssi, bool isSelected, bool forceFullRedraw);
     void DrawSearchingAnimation(uint8_t dots, uint8_t rowIndex);
-    
-    void DrawAttackTelemetry(std::string_view targetMac, uint8_t channel, uint32_t packetsSent, bool forceFullRedraw);
+
+    void DrawAttackTelemetry(std::string_view targetMac, uint8_t channel, uint32_t packetsSent, uint32_t eapolCaught, bool forceFullRedraw);
+    void DrawActionRow(uint8_t index, std::string_view text, bool isSelected, uint16_t textColor, bool isHeader);
+    void DrawPmkidTelemetry(std::string_view targetMac, uint32_t authSent, uint32_t assocSent, bool isCaught, bool forceFullRedraw);
 
 private:
     DisplayDriver();
@@ -82,6 +84,7 @@ private:
 
     LGFX_Config_ILI9341 tft_;
 
+    uint32_t lastEapolCaught_ = 0xFFFFFFFF;
     uint32_t lastPacketsSent_ = 0xFFFFFFFF;
     uint8_t lastChannel_ = 0xFF;
 };

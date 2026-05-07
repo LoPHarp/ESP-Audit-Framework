@@ -1,6 +1,9 @@
 #include "wifi_sniffer.hpp"
 #include "../storage/AccessPointManager.hpp"
 #include "../attacks/DeauthManager.hpp"
+#include "../attacks/HandshakeCatcher.hpp"
+#include "../attacks/BeaconSpamManager.hpp"
+#include "../attacks/PmkidManager.hpp"
 
 #include <iostream>
 
@@ -61,12 +64,17 @@ void WifiSniffer::promiscuous_rx_cb(void* buf, wifi_promiscuous_pkt_type_t type)
         {
             if (beacon->ssid[0] != '\0') 
             {
-                AccessPointManager::GetInstance().AddOrUpdateAP(beacon->base.bssid, beacon->ssid, beacon->base.rssi, beacon->channel);
+                AccessPointManager::GetInstance().AddOrUpdateAP(beacon->base.bssid, beacon->ssid, beacon->base.rssi, beacon->channel, beacon->security);
             }
         }
         else if (auto* data = std::get_if<DataFrame>(&frameVariant))
         {
             AccessPointManager::GetInstance().AddOrUpdateStation(data->base.source, data->base.bssid, data->base.rssi);
+            
+            if (data->hasEapol)
+            {
+                HandshakeCatcher::GetInstance().ProcessEapolPacket(payload);
+            }
         }
     }
 //#endif
@@ -77,7 +85,19 @@ void WifiSniffer::HopperTask(void* arg)
     uint8_t channel = 1;
     while (true)
     {
-        if (!DeauthManager::GetInstance().IsAttacking())
+        bool lockChannel = false;
+        
+        auto deauthMode = DeauthManager::GetInstance().GetCurrentMode();
+        if (DeauthManager::GetInstance().IsAttacking() && deauthMode != AttackMode::GlobalSpam) 
+            lockChannel = true;
+            
+        if (BeaconSpamManager::GetInstance().IsActive() && BeaconSpamManager::GetInstance().GetTargetChannel() != BEACON_SPAM_HOPPING) 
+            lockChannel = true;
+            
+        if (PmkidManager::GetInstance().IsActive()) 
+            lockChannel = true;
+
+        if (!lockChannel)
         {
             esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
             channel++;

@@ -19,7 +19,7 @@ void AccessPointManager::Initialize()
     stations_.reserve(200);
 }
 
-void AccessPointManager::AddOrUpdateAP(const MacAddress& bssid, const char* ssid, int8_t rssi, uint8_t channel)
+void AccessPointManager::AddOrUpdateAP(const MacAddress& bssid, const char* ssid, int8_t rssi, uint8_t channel, const SecurityInfo& sec)
 {
     scoped_lock lock(mtx_);
 
@@ -32,6 +32,7 @@ void AccessPointManager::AddOrUpdateAP(const MacAddress& bssid, const char* ssid
         it->rssi = rssi;
         it->lastSeen = xTaskGetTickCount();
         it->channel = channel;
+        it->security = sec;
         if(ssid[0] != '\0')
         {
             strncpy(it->ssid, ssid, 32);
@@ -45,6 +46,7 @@ void AccessPointManager::AddOrUpdateAP(const MacAddress& bssid, const char* ssid
             newPoint.channel = channel;
             newPoint.lastSeen = xTaskGetTickCount();
             newPoint.rssi = rssi;
+            newPoint.security = sec;
             strncpy(newPoint.ssid, ssid, 32);
             newPoint.ssid[32] = '\0';
             accessPoints_.push_back(newPoint);

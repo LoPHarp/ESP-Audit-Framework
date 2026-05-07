@@ -34,6 +34,32 @@ optional<FrameVariant> FrameParser::parse(span<const uint8_t> buffer, int8_t rss
     {
         DataFrame data;
         data.base = baseFrame;
+        
+        data.isQoS = (subtype & 0x08) != 0;
+        
+        bool isProtected = (buffer[1] & 0x40) != 0; 
+        bool hasHtControl = (buffer[1] & 0x80) != 0;
+
+        size_t macHeaderLen = 24;
+        
+        if (data.isQoS) 
+        {
+            macHeaderLen += 2;
+            if (hasHtControl) macHeaderLen += 4;
+        }
+
+        data.hasEapol = false;
+
+        if (!isProtected && buffer.size() >= macHeaderLen + 8)
+        {
+            const uint8_t* llc = buffer.data() + macHeaderLen;
+            if (llc[0] == 0xAA && llc[1] == 0xAA && llc[2] == 0x03 &&
+                llc[6] == 0x88 && llc[7] == 0x8E)
+            {
+                data.hasEapol = true;
+            }
+        }
+
         return FrameVariant{data};
     }
 
@@ -69,6 +95,7 @@ bool FrameParser::parseBeaconTags(span<const uint8_t> payload, BeaconFrame& beac
         return false;
 
     beacon.channel = 0;
+    beacon.security = {false, false, false};
     size_t offset = 12;
     size_t fcs_length = 4;
 
@@ -91,11 +118,50 @@ bool FrameParser::parseBeaconTags(span<const uint8_t> payload, BeaconFrame& beac
         {
             beacon.channel = payload[offset + 2];
         }
+        else if (tagNumber == 48)
+        {
+            parseRSN(payload.subspan(offset + 2, tagLength), beacon.security);
+        }
         
         offset += 2 + tagLength;
     }
 
     return true;
+}
+
+void FrameParser::parseRSN(span<const uint8_t> rsnData, SecurityInfo& sec)
+{
+    if (rsnData.size() < 2)
+        return;
+
+    size_t offset = 2;
+
+    if (offset + 4 > rsnData.size()) return;
+    offset += 4;
+
+    if (offset + 2 > rsnData.size()) return;
+    uint16_t pairwiseCount = rsnData[offset] | (rsnData[offset + 1] << 8);
+    offset += 2 + (pairwiseCount * 4);
+
+    if (offset + 2 > rsnData.size()) return;
+    uint16_t akmCount = rsnData[offset] | (rsnData[offset + 1] << 8);
+    offset += 2;
+
+    for (uint16_t i = 0; i < akmCount; ++i)
+    {
+        if (offset + 4 > rsnData.size()) return;
+        
+        if (rsnData[offset] == 0x00 && rsnData[offset + 1] == 0x0F && rsnData[offset + 2] == 0xAC && rsnData[offset + 3] == 0x08)
+            sec.isWPA3 = true;
+            
+        offset += 4;
+    }
+
+    if (offset + 2 > rsnData.size()) return;
+    uint16_t rsnCaps = rsnData[offset] | (rsnData[offset + 1] << 8);
+    
+    sec.isPMFRequired = (rsnCaps & (1 << 6)) != 0;
+    sec.isPMFCapable = (rsnCaps & (1 << 7)) != 0;
 }
 
 bool FrameParser::parseProbeRequestTags(span<const uint8_t> payload, ProbeRequestFrame& probe)

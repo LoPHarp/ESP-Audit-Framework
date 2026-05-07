@@ -24,11 +24,18 @@ struct RawFrame
     int8_t rssi;
 };
 
+struct SecurityInfo
+{
+    bool isWPA3;
+    bool isPMFCapable;
+    bool isPMFRequired;
+};
 struct BeaconFrame          // Фрейм, який розсилає точка доступу для оголошення своєї присутності
 {
     RawFrame base;
     char ssid[33];
     uint8_t channel;
+    SecurityInfo security;
 
     bool operator==(const BeaconFrame& other) const
     {
@@ -50,6 +57,8 @@ struct ProbeRequestFrame    // Фрейм від різних пристроїв
 struct DataFrame
 {
     RawFrame base;
+    bool isQoS;
+    bool hasEapol;
 };
 
 using FrameVariant = std::variant<BeaconFrame, ProbeRequestFrame, DataFrame>;

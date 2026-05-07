@@ -20,6 +20,7 @@ struct AccessPoint
     int8_t rssi;
     uint8_t channel;
     uint32_t lastSeen;
+    SecurityInfo security;
 };
 
 class AccessPointManager
@@ -28,7 +29,7 @@ public:
     static AccessPointManager& GetInstance();
     void Initialize();
 
-    void AddOrUpdateAP(const MacAddress& bssid, const char* ssid, int8_t rssi, uint8_t channel);
+    void AddOrUpdateAP(const MacAddress& bssid, const char* ssid, int8_t rssi, uint8_t channel, const SecurityInfo& sec);
     void AddOrUpdateStation(const MacAddress& stationMac, const MacAddress& bssid, int8_t rssi);
 
     std::vector<AccessPoint> GetAccessPoints();

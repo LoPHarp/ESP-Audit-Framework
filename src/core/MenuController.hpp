@@ -52,7 +52,9 @@ private:
 
     bool isTargetingAP_ = false;
     MacAddress selectedClientMAC_;
-    MenuState previousReconState_ = MenuState::Recon_AP_Clients;
+    MenuState sourceListState_ = MenuState::Recon_AP_List;
+    MenuState clientReturnState_ = MenuState::Recon_AP_Clients;
+    MenuState attackReturnState_ = MenuState::Main;
 
     void ChangeState(MenuState newState); 
     

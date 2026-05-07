@@ -5,6 +5,7 @@
 #include <format>
 #include <esp_timer.h> 
 #include <algorithm>   
+#include <esp_random.h>
 
 using namespace std;
 
@@ -143,8 +144,16 @@ void BeaconSpamManager::SpamTask(void* arg)
 
     while (manager->isActive_.load())
     {
+        MacAddress fakeMac;
+        uint32_t r1 = esp_random();
+        uint32_t r2 = esp_random();
+        memcpy(&fakeMac.addr[0], &r1, 4);
+        memcpy(&fakeMac.addr[4], &r2, 2);
+        
+        fakeMac.addr[0] &= 0xFE;
+        fakeMac.addr[0] |= 0x02;
+
         string fakeSsid = format("Pwned_Network_{}", spamCounter);
-        MacAddress fakeMac = {0x02, 0x00, 0x00, 0x00, 0x00, static_cast<uint8_t>(spamCounter & 0xFF)};
 
         uint8_t activeChannel = manager->targetChannel_;
 

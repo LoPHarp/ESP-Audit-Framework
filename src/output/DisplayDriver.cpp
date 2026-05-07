@@ -211,7 +211,7 @@ void DisplayDriver::DrawSearchingAnimation(uint8_t dots, uint8_t rowIndex)
     tft_.print(text.c_str());
 }
 
-void DisplayDriver::DrawAttackTelemetry(string_view targetMac, uint8_t channel, uint32_t packetsSent, bool forceFullRedraw)
+void DisplayDriver::DrawAttackTelemetry(string_view targetMac, uint8_t channel, uint32_t packetsSent, uint32_t eapolCaught, bool forceFullRedraw)
 {
     if (forceFullRedraw)
     {
@@ -220,7 +220,7 @@ void DisplayDriver::DrawAttackTelemetry(string_view targetMac, uint8_t channel, 
         tft_.setFont(&ukrFont);
         tft_.setTextSize(1.0);
         
-        tft_.setTextColor(TFT_RED, TFT_BLACK);
+        tft_.setTextColor(TFT_MAGENTA, TFT_BLACK);
         tft_.setCursor(10, 40);
         tft_.print(">> АКТИВНА АТАКА: СПАМ <<");
         
@@ -233,6 +233,10 @@ void DisplayDriver::DrawAttackTelemetry(string_view targetMac, uint8_t channel, 
 
         tft_.setCursor(10, 135);
         tft_.print("ВІДПРАВЛЕНО:");
+        
+        // --- НОВЫЙ БЛОК ---
+        tft_.setCursor(10, 170);
+        tft_.print("EAPOL У БУФЕРІ:");
         
         lastChannel_ = 0xFF;
     }
@@ -257,4 +261,98 @@ void DisplayDriver::DrawAttackTelemetry(string_view targetMac, uint8_t channel, 
         
         lastPacketsSent_ = packetsSent;
     }
+    
+    if (forceFullRedraw || eapolCaught != lastEapolCaught_)
+    {
+        tft_.setFont(&ukrFont);
+        tft_.setTextSize(1.0);
+        tft_.setTextColor(eapolCaught > 0 ? TFT_GREEN : TFT_YELLOW, TFT_BLACK); 
+        tft_.setCursor(130, 170); 
+        tft_.printf("%-6lu", eapolCaught); 
+        
+        lastEapolCaught_ = eapolCaught;
+    }
+}
+
+void DisplayDriver::DrawPmkidTelemetry(string_view targetMac, uint32_t authSent, uint32_t assocSent, bool isCaught, bool forceFullRedraw)
+{
+    if (forceFullRedraw)
+    {
+        tft_.fillRect(0, 25, tft_.width(), tft_.height() - 25, TFT_BLACK);
+        
+        tft_.setFont(&ukrFont);
+        tft_.setTextSize(1.0);
+        
+        tft_.setTextColor(TFT_MAGENTA, TFT_BLACK);
+        tft_.setCursor(10, 40);
+        tft_.print(">> АКТИВНА АТАКА: PMKID <<");
+        
+        tft_.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft_.setCursor(10, 75);
+        tft_.printf("ЦІЛЬ:  %s", string(targetMac).c_str());
+        
+        tft_.setCursor(10, 100);
+        tft_.print("AUTH Відправлено: ");
+        
+        tft_.setCursor(10, 125);
+        tft_.print("ASSOC Відправлено:");
+        
+        tft_.setCursor(10, 160);
+        tft_.print("Отримано Хендшейк:");
+    }
+
+    tft_.setFont(&ukrFont);
+    tft_.setTextSize(1.0);
+    
+    tft_.setTextColor(TFT_YELLOW, TFT_BLACK); 
+    tft_.setCursor(150, 100); 
+    tft_.printf("%-6lu", authSent);
+    
+    tft_.setCursor(150, 125); 
+    tft_.printf("%-6lu", assocSent);
+
+    tft_.setCursor(150, 160);
+    if (isCaught)
+    {
+        tft_.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft_.print("ТАК  ");
+        
+        tft_.setCursor(10, 195);
+        tft_.print(">> ЦЕ ВІКНО МОЖНА ЗАЧИНИТИ <<");
+        
+        uint32_t ms = pdTICKS_TO_MS(xTaskGetTickCount());
+        uint16_t borderColor = (ms % 1000 < 500) ? TFT_GREEN : TFT_BLACK;
+        tft_.drawRect(0, 24, tft_.width(), tft_.height() - 24, borderColor);
+        tft_.drawRect(1, 25, tft_.width()-2, tft_.height() - 26, borderColor);
+    }
+    else
+    {
+        tft_.setTextColor(TFT_RED, TFT_BLACK);
+        tft_.print("НІ   ");
+        tft_.drawRect(0, 24, tft_.width(), tft_.height() - 24, TFT_BLACK);
+        tft_.drawRect(1, 25, tft_.width()-2, tft_.height() - 26, TFT_BLACK);
+    }
+}
+
+void DisplayDriver::DrawActionRow(uint8_t index, string_view text, bool isSelected, uint16_t textColor, bool isHeader)
+{
+    int yPos = 25 + (index * 25);
+    
+    uint16_t bgColor = TFT_BLACK;
+    uint16_t fgColor = textColor;
+
+    if (!isHeader && isSelected)
+    {
+        bgColor = TFT_GREEN;
+        fgColor = TFT_BLACK;
+    }
+
+    tft_.fillRect(0, yPos, tft_.width(), 25, bgColor);
+    
+    tft_.setTextColor(fgColor);
+    tft_.setFont(&ukrFont);
+    tft_.setTextSize(1.0); 
+
+    tft_.setCursor(5, yPos + 6);
+    tft_.print(string(text).c_str());
 }

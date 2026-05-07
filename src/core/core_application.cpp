@@ -1,6 +1,6 @@
 #include "core_application.hpp"
 #include "MenuController.hpp"
-#include "../tests/test_manager.hpp"
+#include "../attacks/HandshakeCatcher.hpp"
 
 #include <nvs_flash.h>
 #include <esp_wifi.h>
@@ -34,6 +34,7 @@ void CoreApplication::Initialize()
     AccessPointManager::GetInstance().Initialize();
     InputManager::GetInstance().Initialize(); 
     MenuController::GetInstance().Initialize();
+    HandshakeCatcher::GetInstance().Initialize();
 }
 
 void CoreApplication::Run()
