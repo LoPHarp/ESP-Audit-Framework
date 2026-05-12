@@ -36,6 +36,8 @@ public:
     void StartLogging();
     void StopLogging();
 
+    bool IsMounted() const { return isCardMounted_; }
+
 private:
     PcapWriter() = default;
     ~PcapWriter() = default;
@@ -48,5 +50,6 @@ private:
 
     TaskHandle_t writerTaskHandle_{nullptr};
     bool isLogging_{false};
+    bool isCardMounted_{false};
     std::string currentFilePath_{"/sdcard/handshakes.pcap"};
 };

@@ -64,8 +64,7 @@ void MenuController::ProcessInput()
                         case 0: WifiSniffer::GetInstance().Start(); ChangeState(MenuState::Recon_AP_List); break;
                         case 1: WifiSniffer::GetInstance().Start(); ChangeState(MenuState::Recon_Station_List); break;
                         case 2: WifiSniffer::GetInstance().Start(); ChangeState(MenuState::Mass_Attacks_Menu); break;
-                        case 3: ChangeState(MenuState::Sniffer_Live); break;
-                        case 4: ChangeState(MenuState::Settings_Main); break;
+                        case 3: ChangeState(MenuState::Settings_Main); break;
                     }
                     break;
                 case MenuState::Recon_AP_List:
@@ -196,6 +195,14 @@ void MenuController::ProcessInput()
                     if (attackReturnState_ == MenuState::Target_Action_Menu)
                         selectedIndex_ = 2; 
                     break;
+                case MenuState::Settings_Main:
+                    if (selectedIndex_ == 0)
+                    {
+                        bool current = HandshakeCatcher::GetInstance().IsPassiveCollectionEnabled();
+                        HandshakeCatcher::GetInstance().SetPassiveCollection(!current);
+                        lastSelectedIndex_ = 255;
+                    }
+                    break;
                 default: break;
             }
             break;
@@ -229,6 +236,9 @@ void MenuController::ProcessInput()
                     ChangeState(attackReturnState_);
                     break;
                 case MenuState::Main:
+                    break;
+                case MenuState::Settings_Main:
+                    ChangeState(MenuState::Main);
                     break;
                 default:
                     WifiSniffer::GetInstance().Stop();
@@ -281,9 +291,7 @@ void MenuController::Update()
     else if (currentState_ == MenuState::Recon_AP_List) statusBarTitle = "ТОЧКИ ДОСТУПУ";
     else if (currentState_ == MenuState::Recon_Station_List) statusBarTitle = "ГЛОБАЛЬНИЙ ПОШУК";
     else if (currentState_ == MenuState::Mass_Attacks_Menu) statusBarTitle = "МАСОВІ АТАКИ";
-    else if (currentState_ == MenuState::Recon_AP_Clients || 
-             currentState_ == MenuState::Target_Action_Menu || 
-             currentState_ == MenuState::Attack_Spam_Menu) 
+    else if (currentState_ == MenuState::Recon_AP_Clients || currentState_ == MenuState::Target_Action_Menu || currentState_ == MenuState::Attack_Spam_Menu) 
     {
         bool isGlobalAttack = false;
         if (currentState_ == MenuState::Attack_Spam_Menu) 
@@ -308,7 +316,8 @@ void MenuController::Update()
         }
     }
 
-    disp.DrawStatusBar(statusBarTitle, 0.85f, "18:25");
+    uint32_t sessionEapol = HandshakeCatcher::GetInstance().GetSessionEapolCount();
+    disp.DrawStatusBar(statusBarTitle, 0.85f, "18:25", sessionEapol);
 
     switch (currentState_)
     {
@@ -319,6 +328,7 @@ void MenuController::Update()
         case MenuState::Target_Action_Menu: RenderTargetActionMenu(); break;
         case MenuState::Mass_Attacks_Menu: RenderMassAttacksMenu(); break;
         case MenuState::Attack_Spam_Menu: RenderAttackScreen(); break;
+        case MenuState::Settings_Main: RenderSettingsMain(); break;
         default: break;
     }
 
@@ -339,7 +349,6 @@ void MenuController::RenderMainMenu()
         "Пошук мереж (AP)",
         "Пошук пристроїв (STA)",
         "Масові атаки",
-        "Сніфер",
         "Налаштування"
     };
 
@@ -525,12 +534,21 @@ void MenuController::RenderAttackScreen()
 
     bool forceFullRedraw = (lastSelectedIndex_ == 255);
 
+    uint32_t eapol = 0;
+    if (deauth.GetCurrentMode() == AttackMode::GlobalSpam || (beaconSpam.IsActive() && beaconSpam.GetTargetChannel() == BEACON_SPAM_HOPPING))
+    {
+        eapol = HandshakeCatcher::GetInstance().GetPacketsInQueue();
+    }
+    else
+    {
+        eapol = HandshakeCatcher::GetInstance().GetTargetEapolCount();
+    }
+
     if (beaconSpam.IsActive())
     {
         string targetMacStr = "ГЕНЕРАЦІЯ ФЕЙКІВ (Beacon)";
         uint8_t currentChannel = beaconSpam.GetTargetChannel(); 
         uint32_t packets = beaconSpam.GetPacketsSent();
-        uint32_t eapol = HandshakeCatcher::GetInstance().GetPacketsInQueue();
 
         disp.DrawAttackTelemetry(targetMacStr, currentChannel, packets, eapol, forceFullRedraw);
         if (eapol > 0) lastDataVersion_++; 
@@ -555,7 +573,6 @@ void MenuController::RenderAttackScreen()
         string targetMacStr = "ГЛОБАЛЬНИЙ СПАМ (Всі ТД)";
         uint8_t currentChannel = deauth.GetTargetChannel(); 
         uint32_t packets = deauth.GetPacketsSent();
-        uint32_t eapol = HandshakeCatcher::GetInstance().GetPacketsInQueue();
 
         disp.DrawAttackTelemetry(targetMacStr, currentChannel, packets, eapol, forceFullRedraw);
         if (eapol > 0) lastDataVersion_++;
@@ -580,7 +597,6 @@ void MenuController::RenderAttackScreen()
             targetMacStr = selectedClientMAC_.toString();
 
         uint32_t packets = deauth.GetPacketsSent();
-        uint32_t eapol = HandshakeCatcher::GetInstance().GetPacketsInQueue();
 
         disp.DrawAttackTelemetry(targetMacStr, targetChannel, packets, eapol, forceFullRedraw);
         if (eapol > 0) lastDataVersion_++;
@@ -602,3 +618,9 @@ void MenuController::RenderMassAttacksMenu()
     }
 }
 
+void MenuController::RenderSettingsMain()
+{
+    bool isPassive = HandshakeCatcher::GetInstance().IsPassiveCollectionEnabled();
+    currentMenuSize_ = 1;
+    DisplayDriver::GetInstance().DrawSettingRow(0, "Пасив. збір EAPOL", isPassive, (selectedIndex_ == 0));
+}

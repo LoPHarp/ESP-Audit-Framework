@@ -1,5 +1,7 @@
 #include "DisplayDriver.hpp"
 #include "UkrFont.hpp"
+//#include "../storage/PcapWriter.hpp"
+#include "driver/gpio.h"
 
 using namespace std;
 
@@ -32,15 +34,17 @@ void DisplayDriver::ResetState()
     lastTime_ = "";
     lastBattery_ = -1.0f;
     lastAnimDots_ = 255;
+    lastSessionEapol_ = 0xFFFFFFFF;
 }
 
-void DisplayDriver::DrawStatusBar(string_view title, float battery, string_view time)
+void DisplayDriver::DrawStatusBar(string_view title, float battery, string_view time, uint32_t sessionEapol)
 {
     bool titleChanged = (lastTitle_ != title);
     bool timeChanged = (lastTime_ != time);
     bool batChanged = (abs(lastBattery_ - battery) > 0.01f);
+    bool eapolChanged = (lastSessionEapol_ != sessionEapol);
 
-    if (!titleChanged && !timeChanged && !batChanged) 
+    if (!titleChanged && !timeChanged && !batChanged && !eapolChanged) 
         return;
 
     tft_.setFont(&ukrFont);
@@ -54,8 +58,10 @@ void DisplayDriver::DrawStatusBar(string_view title, float battery, string_view 
         tft_.setCursor(5, 3);
         tft_.print(string(title).c_str());
         lastTitle_ = string(title);
+        
         timeChanged = true; 
         batChanged = true;
+        eapolChanged = true; 
     }
 
     if (timeChanged)
@@ -67,13 +73,28 @@ void DisplayDriver::DrawStatusBar(string_view title, float battery, string_view 
         lastTime_ = string(time);
     }
 
+    /*
+    bool sdMounted = PcapWriter::GetInstance().IsMounted();
+    tft_.setTextColor(sdMounted ? TFT_WHITE : TFT_RED, tft_.color565(0, 60, 0));
+    tft_.setCursor(tft_.width() - 150, 3);
+    tft_.print(sdMounted ? "SD" : "NO SD");
+    */
+
+    if (eapolChanged)
+    {
+        tft_.setTextColor(TFT_ORANGE, tft_.color565(0, 60, 0));
+        tft_.setCursor(tft_.width() - 110, 3);
+        tft_.printf("E:%-4lu", sessionEapol);
+        lastSessionEapol_ = sessionEapol;
+    }
+
     if (batChanged)
     {
         int batPercent = (int)(battery * 100);
         uint16_t batColor = (batPercent < 20) ? TFT_RED : (batPercent < 50 ? TFT_YELLOW : TFT_GREEN);
         tft_.setTextColor(batColor, tft_.color565(0, 60, 0));
         tft_.setCursor(tft_.width() - 55, 3);
-        tft_.printf("%3d%%", batPercent); // %3d затирает старые символы
+        tft_.printf("%3d%%", batPercent);
         tft_.drawRect(tft_.width() - 20, 5, 15, 10, batColor);
         tft_.fillRect(tft_.width() - 20, 5, (int)(15 * battery), 10, batColor);
         lastBattery_ = battery;
@@ -355,4 +376,28 @@ void DisplayDriver::DrawActionRow(uint8_t index, string_view text, bool isSelect
 
     tft_.setCursor(5, yPos + 6);
     tft_.print(string(text).c_str());
+}
+
+void DisplayDriver::DrawSettingRow(uint8_t index, string_view label, bool isActive, bool isSelected)
+{
+    int yPos = 25 + (index * 25);
+    
+    uint16_t bgColor = isSelected ? TFT_GREEN : TFT_BLACK;
+    uint16_t fgColor = isSelected ? TFT_BLACK : TFT_WHITE;
+
+    tft_.fillRect(0, yPos, tft_.width(), 25, bgColor);
+    
+    tft_.setFont(&ukrFont);
+    tft_.setTextSize(1.0); 
+
+    tft_.setTextColor(fgColor);
+    tft_.setCursor(5, yPos + 6);
+    tft_.print(string(label).c_str());
+
+    uint16_t statusColor = isSelected ? TFT_BLACK : (isActive ? TFT_GREEN : TFT_RED);
+    tft_.setTextColor(statusColor);
+    
+    int rightOffset = isActive ? 50 : 45;
+    tft_.setCursor(tft_.width() - rightOffset, yPos + 6); 
+    tft_.print(isActive ? "УВІМК" : "ВИМК");
 }

@@ -4,7 +4,12 @@
 #include <cstdio>
 #include <esp_timer.h>
 #include <driver/sdmmc_host.h>
+#include <driver/sdspi_host.h>
+#include <driver/spi_common.h>
+#include "driver/gpio.h"
 #include <esp_vfs_fat.h>
+#include <sdmmc_cmd.h>
+#include <iostream>
 
 using namespace std;
 
@@ -16,15 +21,64 @@ PcapWriter& PcapWriter::GetInstance()
 
 void PcapWriter::Initialize()
 {
-    // Здесь будет код инициализации SPI для SD карты
-    // Обычно это esp_vfs_fat_sdspi_mount()
-    // Пока оставим заглушку, чтобы сфокусироваться на логике PCAP
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    gpio_set_pull_mode(GPIO_NUM_12, GPIO_PULLUP_ONLY);
+
+    spi_bus_config_t bus_cfg = {};
+    bus_cfg.mosi_io_num = GPIO_NUM_13;
+    bus_cfg.miso_io_num = GPIO_NUM_12;
+    bus_cfg.sclk_io_num = GPIO_NUM_14;
+    bus_cfg.quadwp_io_num = -1;
+    bus_cfg.quadhd_io_num = -1;
+    bus_cfg.max_transfer_sz = 4000;
+
+    esp_err_t ret = spi_bus_initialize(SPI2_HOST, &bus_cfg, SPI_DMA_CH_AUTO);
+    if (ret != ESP_OK)
+    {
+        cout << "[SPI] Помилка ініціалізації HSPI: " << esp_err_to_name(ret) << endl;
+        isCardMounted_ = false;
+        return;
+    }
+
+    esp_vfs_fat_sdmmc_mount_config_t mount_config = {}; 
+    mount_config.format_if_mount_failed = true;
+    mount_config.max_files = 5;
+    mount_config.allocation_unit_size = 16 * 1024;
+    mount_config.disk_status_check_enable = false;
+
+    sdmmc_host_t host = SDSPI_HOST_DEFAULT();
+    host.slot = SPI2_HOST; 
+    host.max_freq_khz = 400;
+
+    sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
+    slot_config.gpio_cs = GPIO_NUM_5;
+    slot_config.host_id = SPI2_HOST;
+
+    sdmmc_card_t* card;
+    ret = esp_vfs_fat_sdspi_mount("/sdcard", &host, &slot_config, &mount_config, &card);
+
+    if (ret != ESP_OK) 
+    {
+        cout << "[SD CARD] Помилка монтування! Код: " << esp_err_to_name(ret) << endl;
+        isCardMounted_ = false;
+        return;
+    }
+
+    cout << "[SD CARD] Успішно змонтовано!" << endl;
+    isCardMounted_ = true;
+    StartLogging();
 }
 
 void PcapWriter::StartLogging()
 {
     if (isLogging_) return;
-    
+    if (!isCardMounted_)
+    {
+        cout << "[PCAP] Помилка: SD карта не підключена!" << endl;
+        return;
+    }
+
     isLogging_ = true;
     WriteGlobalHeaderIfNeeded(currentFilePath_);
     
@@ -108,7 +162,7 @@ void PcapWriter::WriterTask(void* arg)
     {       
         size_t bufferedBytes = HandshakeCatcher::GetInstance().GetBufferedBytesCount();
         
-        if (bufferedBytes > 65536 || msCounter >= 5000) 
+        if (bufferedBytes > 0 || msCounter >= 2000) 
         {
             if (bufferedBytes > 0) {
                 writer->FlushBufferToFile();

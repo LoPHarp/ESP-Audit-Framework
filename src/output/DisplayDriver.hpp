@@ -59,7 +59,7 @@ public:
     void ClearScreen();
     void ResetState();
 
-    void DrawStatusBar(std::string_view title, float battery, std::string_view time);
+    void DrawStatusBar(std::string_view title, float battery, std::string_view time, uint32_t sessionEapol);
     void DrawMenuRow(uint8_t index, std::string_view text, bool isSelected);
     void DrawAPRow(uint8_t index, std::string_view ssid, uint8_t channel, size_t clients, int8_t rssi, bool isSelected, bool forceFullRedraw);
     void DrawAPClientRow(uint8_t index, std::string_view mac, uint32_t lastSeenTick, int8_t rssi, bool isSelected, bool forceFullRedraw);
@@ -69,6 +69,8 @@ public:
     void DrawAttackTelemetry(std::string_view targetMac, uint8_t channel, uint32_t packetsSent, uint32_t eapolCaught, bool forceFullRedraw);
     void DrawActionRow(uint8_t index, std::string_view text, bool isSelected, uint16_t textColor, bool isHeader);
     void DrawPmkidTelemetry(std::string_view targetMac, uint32_t authSent, uint32_t assocSent, bool isCaught, bool forceFullRedraw);
+
+    void DrawSettingRow(uint8_t index, std::string_view label, bool isActive, bool isSelected);
 
 private:
     DisplayDriver();
@@ -80,6 +82,8 @@ private:
     std::string lastTitle_;
     std::string lastTime_;
     float lastBattery_ = -1.0f;
+    uint32_t lastSessionEapol_ = 0xFFFFFFFF;
+
     uint8_t lastAnimDots_ = 255;
 
     LGFX_Config_ILI9341 tft_;

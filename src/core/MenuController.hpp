@@ -69,5 +69,5 @@ private:
     void RenderTargetActionMenu();
     void RenderAttackScreen();
 
-    
+    void RenderSettingsMain();  
 };

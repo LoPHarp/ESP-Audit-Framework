@@ -1,4 +1,5 @@
 #include "PmkidManager.hpp"
+#include "HandshakeCatcher.hpp"
 #include <esp_wifi.h>
 #include <esp_random.h>
 #include <cstring>
@@ -26,6 +27,9 @@ void PmkidManager::StartAttack(const MacAddress& apMac, string_view ssid, uint8_
     targetSsid_ = string(ssid);
     targetChannel_ = channel;
     
+    MacAddress broadcastMac = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    HandshakeCatcher::GetInstance().SetTarget(apMac, broadcastMac);
+    
     isActive_.store(true);
     xTaskCreate(AttackTask, "PmkidTask", 4096, this, 2, &attackTaskHandle_);
 }
@@ -45,6 +49,7 @@ void PmkidManager::StopAttack()
              attackTaskHandle_ = nullptr;
         }
     }
+    HandshakeCatcher::GetInstance().ClearTarget();
 }
 
 void PmkidManager::OnEapolReceived(const MacAddress& srcMac)
