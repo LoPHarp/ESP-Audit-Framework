@@ -32,19 +32,17 @@ void DisplayDriver::ResetState()
 {
     lastTitle_ = "";
     lastTime_ = "";
-    lastBattery_ = -1.0f;
     lastAnimDots_ = 255;
     lastSessionEapol_ = 0xFFFFFFFF;
 }
 
-void DisplayDriver::DrawStatusBar(string_view title, float battery, string_view time, uint32_t sessionEapol)
+void DisplayDriver::DrawStatusBar(string_view title, string_view time, uint32_t sessionEapol)
 {
     bool titleChanged = (lastTitle_ != title);
     bool timeChanged = (lastTime_ != time);
-    bool batChanged = (abs(lastBattery_ - battery) > 0.01f);
     bool eapolChanged = (lastSessionEapol_ != sessionEapol);
 
-    if (!titleChanged && !timeChanged && !batChanged && !eapolChanged) 
+    if (!titleChanged && !timeChanged && !eapolChanged) 
         return;
 
     tft_.setFont(&ukrFont);
@@ -60,17 +58,7 @@ void DisplayDriver::DrawStatusBar(string_view title, float battery, string_view 
         lastTitle_ = string(title);
         
         timeChanged = true; 
-        batChanged = true;
         eapolChanged = true; 
-    }
-
-    if (timeChanged)
-    {
-        tft_.setTextColor(TFT_WHITE, tft_.color565(0, 60, 0));
-        int timeWidth = tft_.textWidth(string(time).c_str());
-        tft_.setCursor((tft_.width() - timeWidth) / 2, 3);
-        tft_.print(string(time).c_str());
-        lastTime_ = string(time);
     }
 
     /*
@@ -83,21 +71,18 @@ void DisplayDriver::DrawStatusBar(string_view title, float battery, string_view 
     if (eapolChanged)
     {
         tft_.setTextColor(TFT_ORANGE, tft_.color565(0, 60, 0));
-        tft_.setCursor(tft_.width() - 110, 3);
+        tft_.setCursor(tft_.width() - 150, 3);
         tft_.printf("E:%-4lu", sessionEapol);
         lastSessionEapol_ = sessionEapol;
     }
 
-    if (batChanged)
+    if (timeChanged)
     {
-        int batPercent = (int)(battery * 100);
-        uint16_t batColor = (batPercent < 20) ? TFT_RED : (batPercent < 50 ? TFT_YELLOW : TFT_GREEN);
-        tft_.setTextColor(batColor, tft_.color565(0, 60, 0));
-        tft_.setCursor(tft_.width() - 55, 3);
-        tft_.printf("%3d%%", batPercent);
-        tft_.drawRect(tft_.width() - 20, 5, 15, 10, batColor);
-        tft_.fillRect(tft_.width() - 20, 5, (int)(15 * battery), 10, batColor);
-        lastBattery_ = battery;
+        tft_.setTextColor(TFT_WHITE, tft_.color565(0, 60, 0));
+        int timeWidth = tft_.textWidth(string(time).c_str());
+        tft_.setCursor(tft_.width() - timeWidth - 5, 3);
+        tft_.print(string(time).c_str());
+        lastTime_ = string(time);
     }
 }
 

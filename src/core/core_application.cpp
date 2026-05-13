@@ -2,6 +2,7 @@
 #include "MenuController.hpp"
 #include "../attacks/HandshakeCatcher.hpp"
 //#include "../storage/PcapWriter.hpp"
+#include "../hardware/RTCManager.hpp"
 
 #include <nvs_flash.h>
 #include <esp_wifi.h>
@@ -37,6 +38,7 @@ void CoreApplication::Initialize()
     MenuController::GetInstance().Initialize();
     HandshakeCatcher::GetInstance().Initialize();
     //PcapWriter::GetInstance().Initialize();
+    RTCManager::GetInstance().Initialize();
 }
 
 void CoreApplication::Run()

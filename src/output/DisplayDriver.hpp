@@ -59,7 +59,7 @@ public:
     void ClearScreen();
     void ResetState();
 
-    void DrawStatusBar(std::string_view title, float battery, std::string_view time, uint32_t sessionEapol);
+    void DrawStatusBar(std::string_view title, std::string_view time, uint32_t sessionEapol);
     void DrawMenuRow(uint8_t index, std::string_view text, bool isSelected);
     void DrawAPRow(uint8_t index, std::string_view ssid, uint8_t channel, size_t clients, int8_t rssi, bool isSelected, bool forceFullRedraw);
     void DrawAPClientRow(uint8_t index, std::string_view mac, uint32_t lastSeenTick, int8_t rssi, bool isSelected, bool forceFullRedraw);
@@ -81,7 +81,6 @@ private:
 
     std::string lastTitle_;
     std::string lastTime_;
-    float lastBattery_ = -1.0f;
     uint32_t lastSessionEapol_ = 0xFFFFFFFF;
 
     uint8_t lastAnimDots_ = 255;

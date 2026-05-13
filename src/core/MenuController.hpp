@@ -56,6 +56,13 @@ private:
     MenuState clientReturnState_ = MenuState::Recon_AP_Clients;
     MenuState attackReturnState_ = MenuState::Main;
 
+    std::string lastKnownTime_ = "00:00";
+    uint32_t lastTimeReadTick_ = 0;
+
+    std::vector<AccessPoint> cachedAps_;
+    std::vector<Station> cachedStations_;
+    std::vector<Station> cachedClients_;
+
     void ChangeState(MenuState newState); 
     
     void RenderMainMenu();

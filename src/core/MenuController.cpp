@@ -4,6 +4,7 @@
 #include "../attacks/BeaconSpamManager.hpp"
 #include "../attacks/PmkidManager.hpp"
 #include "../attacks/HandshakeCatcher.hpp"
+#include "../hardware/RTCManager.hpp"
 
 using namespace std;
 
@@ -69,7 +70,7 @@ void MenuController::ProcessInput()
                     break;
                 case MenuState::Recon_AP_List:
                 {
-                    auto aps = AccessPointManager::GetInstance().GetAccessPoints();
+                    auto& aps = cachedAps_;
                     if (selectedIndex_ < aps.size()) 
                     {
                         selectedBSSID_ = aps[selectedIndex_].bssid;
@@ -82,7 +83,7 @@ void MenuController::ProcessInput()
                 }
                 case MenuState::Recon_Station_List:
                 {
-                    auto allStations = AccessPointManager::GetInstance().GetAllStations();
+                    auto& allStations = cachedStations_;
                     if (selectedIndex_ < allStations.size()) 
                     {
                         auto& st = allStations[selectedIndex_];
@@ -111,7 +112,7 @@ void MenuController::ProcessInput()
                     break;
                 case MenuState::Recon_AP_Clients:
                 {
-                    auto clients = AccessPointManager::GetInstance().GetStationsForAP(selectedBSSID_);
+                    auto& clients = cachedClients_;
                     if (selectedIndex_ < clients.size()) 
                     {
                         isTargetingAP_ = false;
@@ -126,7 +127,7 @@ void MenuController::ProcessInput()
                 {
                     uint8_t targetChannel = 1;
                     string targetSsid = "";
-                    auto aps = AccessPointManager::GetInstance().GetAccessPoints();
+                    auto& aps = cachedAps_;
                     for (const auto& ap : aps) 
                     {
                         if (ap.bssid == selectedBSSID_) 
@@ -262,6 +263,10 @@ void MenuController::ChangeState(MenuState newState)
     lastMenuSize_ = 0;
     DisplayDriver::GetInstance().ClearScreen();
     DisplayDriver::GetInstance().ResetState();
+
+    cachedAps_ = AccessPointManager::GetInstance().GetAccessPoints();
+    cachedStations_ = AccessPointManager::GetInstance().GetAllStations();
+    cachedClients_ = AccessPointManager::GetInstance().GetStationsForAP(selectedBSSID_);
 }
 
 void MenuController::Update()
@@ -274,6 +279,18 @@ void MenuController::Update()
     
     static uint32_t lastUiUpdateTick = 0;
     
+    bool timeChanged = false;
+    if (currentTick - lastTimeReadTick_ > pdMS_TO_TICKS(2000))
+    {
+        string newTime = RTCManager::GetInstance().GetCurrentTime();
+        if (newTime != lastKnownTime_)
+        {
+            lastKnownTime_ = newTime;
+            timeChanged = true;
+        }
+        lastTimeReadTick_ = currentTick;
+    }
+
     bool cursorMoved = (selectedIndex_ != lastSelectedIndex_);
     bool dataChanged = (currentDataVersion != lastDataVersion_);
     
@@ -282,7 +299,14 @@ void MenuController::Update()
 
     bool needDbUpdate = (dataChanged && dbTimeToUpdate);
 
-    if (!cursorMoved && !needDbUpdate && !attackTimeToUpdate) 
+    if (needDbUpdate)
+    {
+        cachedAps_ = db.GetAccessPoints();
+        cachedStations_ = db.GetAllStations();
+        cachedClients_ = db.GetStationsForAP(selectedBSSID_);
+    }
+
+    if (!cursorMoved && !needDbUpdate && !attackTimeToUpdate && !timeChanged) 
         return;
 
     string statusBarTitle = "МАРАУДЕР";
@@ -297,7 +321,8 @@ void MenuController::Update()
         if (currentState_ == MenuState::Attack_Spam_Menu) 
         {
             if (DeauthManager::GetInstance().GetCurrentMode() == AttackMode::GlobalSpam ||
-               (BeaconSpamManager::GetInstance().IsActive() && BeaconSpamManager::GetInstance().GetTargetChannel() == BEACON_SPAM_HOPPING)) {
+               (BeaconSpamManager::GetInstance().IsActive() && BeaconSpamManager::GetInstance().GetTargetChannel() == BEACON_SPAM_HOPPING)) 
+            {
                 isGlobalAttack = true;
                 statusBarTitle = "МАСОВА АТАКА";
             }
@@ -305,9 +330,10 @@ void MenuController::Update()
         
         if (!isGlobalAttack) 
         {
-            auto aps = db.GetAccessPoints();
-            for (const auto& ap : aps) {
-                if (ap.bssid == selectedBSSID_) {
+            for (const auto& ap : cachedAps_) 
+            {
+                if (ap.bssid == selectedBSSID_) 
+                {
                     statusBarTitle = string(ap.ssid);
                     if (statusBarTitle.empty()) statusBarTitle = "<Прихована>";
                     break;
@@ -317,7 +343,7 @@ void MenuController::Update()
     }
 
     uint32_t sessionEapol = HandshakeCatcher::GetInstance().GetSessionEapolCount();
-    disp.DrawStatusBar(statusBarTitle, 0.85f, "18:25", sessionEapol);
+    disp.DrawStatusBar(statusBarTitle, lastKnownTime_, sessionEapol);
 
     switch (currentState_)
     {
@@ -362,10 +388,9 @@ void MenuController::RenderMainMenu()
 
 void MenuController::RenderReconAPList()
 {
-    auto& db = AccessPointManager::GetInstance();
     auto& disp = DisplayDriver::GetInstance();
+    auto& aps = cachedAps_;
     
-    auto aps = db.GetAccessPoints();
     currentMenuSize_ = aps.size();
 
     if (aps.empty())
@@ -385,25 +410,29 @@ void MenuController::RenderReconAPList()
         bool viewMoved = (viewOffset_ != lastViewOffset_);
         bool isNewRow = (absoluteIndex >= lastMenuSize_);
 
-        bool force = (lastSelectedIndex_ == 255) || viewMoved || isNewRow || 
-                     (isSelected && cursorMoved) || (absoluteIndex == lastSelectedIndex_ && cursorMoved);
+        bool force = (lastSelectedIndex_ == 255) || viewMoved || isNewRow || (isSelected && cursorMoved) || (absoluteIndex == lastSelectedIndex_ && cursorMoved);
 
-        size_t clientCount = db.GetStationsForAP(ap.bssid).size();
+        size_t clientCount = 0;
+        for (const auto& st : cachedStations_)
+        {
+            if (st.bssid == ap.bssid) clientCount++;
+        }
+
         disp.DrawAPRow(i, ap.ssid, ap.channel, clientCount, ap.rssi, isSelected, force);
     }
 }
 
 void MenuController::RenderReconAPClients()
 {
-    auto& db = AccessPointManager::GetInstance();
     auto& disp = DisplayDriver::GetInstance();
-    
-    auto clients = db.GetStationsForAP(selectedBSSID_);
+    auto& clients = cachedClients_;
     
     AccessPoint currentAP;
     string apName = "Unknown";
-    for(auto& ap : db.GetAccessPoints()) {
-        if(ap.bssid == selectedBSSID_) {
+    for(auto& ap : cachedAps_) 
+    {
+        if(ap.bssid == selectedBSSID_) 
+        {
             currentAP = ap;
             apName = ap.ssid;
             break;
@@ -421,8 +450,7 @@ void MenuController::RenderReconAPClients()
         bool viewMoved = (viewOffset_ != lastViewOffset_);
         bool isNewRow = (actualIndex >= lastMenuSize_);
 
-        bool force = (lastSelectedIndex_ == 255) || viewMoved || isNewRow || 
-                     (isSelected && cursorMoved) || (actualIndex == lastSelectedIndex_ && cursorMoved);
+        bool force = (lastSelectedIndex_ == 255) || viewMoved || isNewRow || (isSelected && cursorMoved) || (actualIndex == lastSelectedIndex_ && cursorMoved);
 
         auto& st = clients[actualIndex];
         disp.DrawAPClientRow(i, st.mac.toString(), st.lastSeen, st.rssi, isSelected, force);
@@ -434,10 +462,9 @@ void MenuController::RenderReconAPClients()
 
 void MenuController::RenderReconStationList()
 {
-    auto& db = AccessPointManager::GetInstance();
     auto& disp = DisplayDriver::GetInstance();
+    auto& allStations = cachedStations_;
     
-    auto allStations = db.GetAllStations();
     currentMenuSize_ = allStations.size();
 
     for (uint8_t i = 0; i < 8 && (i + viewOffset_) < allStations.size(); ++i)
@@ -450,13 +477,10 @@ void MenuController::RenderReconStationList()
         bool viewMoved = (viewOffset_ != lastViewOffset_);
         bool isNewRow = (absoluteIndex >= lastMenuSize_);
 
-        bool force = (lastSelectedIndex_ == 255) || viewMoved || isNewRow || 
-                     (isSelected && cursorMoved) || (absoluteIndex == lastSelectedIndex_ && cursorMoved);
-
+        bool force = (lastSelectedIndex_ == 255) || viewMoved || isNewRow || (isSelected && cursorMoved) || (absoluteIndex == lastSelectedIndex_ && cursorMoved);
 
         string apName = "[Шукає...]";
-        auto aps = db.GetAccessPoints();
-        for(auto& ap : aps)
+        for(auto& ap : cachedAps_)
         {
             if(ap.bssid == st.bssid)
             {
@@ -472,7 +496,7 @@ void MenuController::RenderReconStationList()
 void MenuController::RenderTargetActionMenu()
 {
     auto& disp = DisplayDriver::GetInstance();
-    auto aps = AccessPointManager::GetInstance().GetAccessPoints();
+    auto& aps = cachedAps_;
     
     AccessPoint currentAP;
     for (const auto& ap : aps)
@@ -492,7 +516,7 @@ void MenuController::RenderTargetActionMenu()
         string wpa3Str = currentAP.security.isWPA3 ? "ТАК" : "НІ";
         string secStr = "[ WPA3: " + wpa3Str + " | PMF: " + pmfStr + " ]";
 
-        auto clients = AccessPointManager::GetInstance().GetStationsForAP(selectedBSSID_);
+        auto& clients = cachedClients_;
         string clientsStr = "Показати клієнтів (" + to_string(clients.size()) + ")";
 
         bool deauthBlocked = currentAP.security.isPMFRequired || currentAP.security.isWPA3;
@@ -580,7 +604,7 @@ void MenuController::RenderAttackScreen()
     else 
     {
         uint8_t targetChannel = 1;
-        auto aps = AccessPointManager::GetInstance().GetAccessPoints();
+        auto& aps = cachedAps_;
         for (const auto& ap : aps)
         {
             if (ap.bssid == selectedBSSID_)
