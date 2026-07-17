@@ -8,14 +8,13 @@ This project is a Bachelor's diploma work developed for the National Technical U
 
 ---
 
-## 🎥 Project Demonstration & Documentation
-You can view the project in action here:
-[**Watch the Project Demo Video**](https://www.youtube.com/watch?v=LeNbDbR3qGY)
+### Project Demonstration
+[![Click to watch the video](Resources/images/video_thumbnail.png)](https://www.youtube.com/watch?v=LeNbDbR3qGY)
 
 Access the full technical report (Explanatory Note):
 [**Full Explanatory Note (Diploma Report)**](Resources/Thesis.pdf)
 
-### 📄 Appendices
+### Appendices
 *   [**Appendix E:** Presentation - Diploma Project](Resources/Docs/Presentation.pdf)
 *   [**Appendix A:** Structural Electrical Diagram (ІАЛЦ.467200.005 E1)](Resources/Docs/Appendix_A.pdf)
 *   [**Appendix B:** Schematic Electrical Diagram (ІАЛЦ.467200.006 E3)](Resources/Docs/Appendix_B.pdf)
@@ -24,7 +23,7 @@ Access the full technical report (Explanatory Note):
 
 ---
 
-## ⚙️ Technical Algorithms
+## Technical Algorithms
 The system utilizes advanced multi-threaded processing to ensure high-performance auditing without packet loss.
 
 ### 1. Passive EAPOL Capture
@@ -41,7 +40,7 @@ The system utilizes advanced multi-threaded processing to ensure high-performanc
 
 ---
 
-## 🚀 Key Features
+## Key Features
 *   **Passive Radio Monitoring:** Panoramic packet analysis and detection of hidden networks.
 *   **Active Security Auditing:**
     *   **Deauthentication Attacks:** Targeted or broadcasted frame injection.
@@ -50,7 +49,7 @@ The system utilizes advanced multi-threaded processing to ensure high-performanc
 *   **Performance-Optimized UI:** A graphical user interface (GUI) leveraging **DMA (Direct Memory Access)** via the **LovyanGFX** library, ensuring zero-latency updates.
 *   **Multithreaded Architecture:** Managed by **FreeRTOS**, ensuring independent execution of RF monitoring, attack generation, and UI rendering.
 
-## 🏗 Architecture & Design
+## Architecture & Design
 The software is architected using modern **C++20 standards** with robust design patterns:
 *   **Pattern-based Design:** Singleton pattern used for core modules (DeauthManager, WifiSniffer) to ensure safe, serialized access to hardware resources.
 *   **Asynchronous Processing:** Use of FreeRTOS queues for non-blocking communication between the radio callback (promiscuous mode) and data analysis tasks.
